@@ -1,24 +1,54 @@
-# Savor
+# Savor — fridge dashboard
 
-A static, interactive kitchen inventory demo based on the supplied hackathon video. It is deliberately frontend-only: inventory changes live in the visitor's browser via `localStorage`, so anyone can try the full demo without a database or API keys.
+Read-only viewer for what `backend/pipeline.sh` writes into `backend/experiments/<name>/`:
+what is in the fridge, when each item expires, the recipes the chef proposed, and the scan
+activity behind it. Nothing on the page is typed in by hand — every number, name and time
+comes from `inventory.json`, `expire.json`, `recipes.json` and `events.json`.
 
-## Run locally
-
-```bash
-npm run dev
-```
-
-## Deploy to Cloudflare
+## Run
 
 ```bash
-npm run deploy
+python3 frontend/serve.py            # → http://127.0.0.1:8000
+python3 frontend/serve.py --port 9000
 ```
 
-On the first deploy, Wrangler will ask you to authenticate with Cloudflare. It uploads the `public/` directory as Worker static assets. The configuration uses the current Workers Static Assets format, so there is no Pages-specific setup required.
+Standard library only; no install. Open the address it prints. The page shows
+`backend/experiments/latest` by default; pick another experiment from the dropdown at the top
+or with `?experiment=<name>`.
 
-## Demo flow
+Leave it running while you scan:
 
-1. Click **Fresh scan** to simulate the smart-fridge detection shown in the video.
-2. Open **Inventory** to search, filter, add, or remove ingredients.
-3. Open **Meal plan** and choose a recipe based on matching ingredients.
-4. In **Kitchen settings**, reset the local demo data if needed.
+```bash
+bash backend/pipeline.sh fridge.mp4 experiment1
+```
+
+The page checks the folder every 5 s and re-renders when the files change, so a new run shows
+up on its own. "Hours left" is recomputed from each item's `expires_at` in the browser, so it
+keeps counting down between runs.
+
+## Views
+
+| View | Shows | Source |
+|------|-------|--------|
+| Today | most urgent items, counts, the top recipe | inventory + expire + recipes |
+| Inventory | every item in the fridge: shelf-life match, expiry time, time left, status; items taken out | inventory + expire |
+| Recipes | the chef's recipes, sorted by how many expiring items they use; ingredients and steps in a modal | recipes (+ inventory for "in fridge" counts) |
+| Activity | runs, in/out timeline, links to the raw JSON and each run's `run.log` | events |
+
+Item icons are the PNGs in `backend/db/images/`, keyed by the shelf-life entry `check.py`
+matched. An item with no match ("No shelf life") falls back to a keyword emoji.
+
+Step check-marks in a recipe are kept in the browser's `localStorage` only.
+
+## Layout
+
+```
+frontend/
+  serve.py          HTTP server: static files + /api/experiments[/<name>[/files/<f>]] + /images/
+  public/
+    index.html
+    styles.css
+    app.js          fetches the API, joins the four files (buildModel), renders the views
+```
+
+`serve.py` binds to 127.0.0.1 and has no auth; it is meant for your own machine.

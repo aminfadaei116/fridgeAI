@@ -312,15 +312,3 @@ button.food-row:hover { background: #f3f6f0; }
   .modal, .recipe-modal .modal, .log-modal .modal { width: 100%; max-height: 92vh; border-radius: 23px 23px 0 0; }
   .note-card { flex-direction: column; }
 }
-
-/* ---------- icons from backend/db/images (Fluent Emoji PNGs); emoji text is the fallback ---------- */
-.food-icon img { width: 70%; height: 70%; object-fit: contain; display: block; }
-.food-icon.is-img { background: #f2f5ed; }
-.recipe-image .icon-cluster { position: absolute; z-index: 1; top: 20px; left: 24px; display: flex; }
-.recipe-image .icon-cluster .food-icon { width: 54px; height: 54px; margin-right: -14px; background: #fffdf6; border: 3px solid rgba(255,255,255,.75); border-radius: 50%; box-shadow: 0 6px 14px rgba(0,0,0,.12); font-size: 26px; }
-.recipe-image.has-icons:before { display: none; }
-.mini-recipe-art .icon-cluster { position: absolute; top: 10px; left: 10px; display: flex; }
-.mini-recipe-art .icon-cluster .food-icon { width: 40px; height: 40px; margin-right: -12px; background: #fffdf6; border: 2px solid rgba(255,255,255,.75); border-radius: 50%; font-size: 20px; }
-.mini-recipe-art.has-icons:after { display: none; }
-.refresh-note { color: var(--muted); font-size: 11px; }
-.from-other .ingredient-mark { color: #7a8c84; background: transparent; border: 1px dashed #c7d8cc; }

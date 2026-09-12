@@ -1,0 +1,206 @@
+{
+  "experiment": "experiment1",
+  "updated_at": "2026-09-12T14:54:15-04:00",
+  "runs": [
+    {
+      "run": "2026-09-12_14-44-52",
+      "video": "fridge.mp4",
+      "recorded_at": "2026-09-12T14:44:52-04:00",
+      "duration_s": 20.01,
+      "model": "gemini-3.8-flash",
+      "events": 7,
+      "added": 7,
+      "removed": 0,
+      "untracked_removed": 0
+    },
+    {
+      "run": "2026-09-12_14-45-16",
+      "video": "test.mp4",
+      "recorded_at": "2026-09-12T14:45:17-04:00",
+      "duration_s": 5.47,
+      "model": "gemini-3.8-flash",
+      "events": 1,
+      "added": 1,
+      "removed": 0,
+      "untracked_removed": 0
+    },
+    {
+      "run": "2026-09-12_14-54-09",
+      "video": "fridge.mp4",
+      "recorded_at": "2026-09-12T14:54:09-04:00",
+      "duration_s": 20.01,
+      "model": "gemini-3.8-flash",
+      "events": 7,
+      "added": 7,
+      "removed": 0,
+      "untracked_removed": 0
+    }
+  ],
+  "events": [
+    {
+      "item_id": 1,
+      "object": "pasta box",
+      "action": "in",
+      "time": "2026-09-12T14:44:52-04:00",
+      "run": "2026-09-12_14-44-52",
+      "video": "fridge.mp4",
+      "video_item_id": 1,
+      "time_s": 0.1,
+      "confidence": 0.78
+    },
+    {
+      "item_id": 2,
+      "object": "olive oil bottle",
+      "action": "in",
+      "time": "2026-09-12T14:44:53-04:00",
+      "run": "2026-09-12_14-44-52",
+      "video": "fridge.mp4",
+      "video_item_id": 2,
+      "time_s": 1.6,
+      "confidence": 0.8
+    },
+    {
+      "item_id": 3,
+      "object": "garlic bulb",
+      "action": "in",
+      "time": "2026-09-12T14:44:55-04:00",
+      "run": "2026-09-12_14-44-52",
+      "video": "fridge.mp4",
+      "video_item_id": 3,
+      "time_s": 3.0,
+      "confidence": 0.75
+    },
+    {
+      "item_id": 4,
+      "object": "jar of chili flakes",
+      "action": "in",
+      "time": "2026-09-12T14:44:56-04:00",
+      "run": "2026-09-12_14-44-52",
+      "video": "fridge.mp4",
+      "video_item_id": 4,
+      "time_s": 4.4,
+      "confidence": 0.77
+    },
+    {
+      "item_id": 5,
+      "object": "bunch of parsley",
+      "action": "in",
+      "time": "2026-09-12T14:45:02-04:00",
+      "run": "2026-09-12_14-44-52",
+      "video": "fridge.mp4",
+      "video_item_id": 5,
+      "time_s": 10.0,
+      "confidence": 0.78
+    },
+    {
+      "item_id": 6,
+      "object": "canister of salt",
+      "action": "in",
+      "time": "2026-09-12T14:45:03-04:00",
+      "run": "2026-09-12_14-44-52",
+      "video": "fridge.mp4",
+      "video_item_id": 6,
+      "time_s": 11.3,
+      "confidence": 0.79
+    },
+    {
+      "item_id": 7,
+      "object": "block of cheese",
+      "action": "in",
+      "time": "2026-09-12T14:45:04-04:00",
+      "run": "2026-09-12_14-44-52",
+      "video": "fridge.mp4",
+      "video_item_id": 7,
+      "time_s": 12.8,
+      "confidence": 0.76
+    },
+    {
+      "item_id": 8,
+      "object": "snack bar",
+      "action": "in",
+      "time": "2026-09-12T14:45:19-04:00",
+      "run": "2026-09-12_14-45-16",
+      "video": "test.mp4",
+      "video_item_id": 1,
+      "time_s": 2.4,
+      "confidence": 0.78
+    },
+    {
+      "item_id": 9,
+      "object": "pasta box",
+      "action": "in",
+      "time": "2026-09-12T14:54:09-04:00",
+      "run": "2026-09-12_14-54-09",
+      "video": "fridge.mp4",
+      "video_item_id": 1,
+      "time_s": 0.0,
+      "confidence": 0.75
+    },
+    {
+      "item_id": 10,
+      "object": "olive oil bottle",
+      "action": "in",
+      "time": "2026-09-12T14:54:10-04:00",
+      "run": "2026-09-12_14-54-09",
+      "video": "fridge.mp4",
+      "video_item_id": 2,
+      "time_s": 1.7,
+      "confidence": 0.77
+    },
+    {
+      "item_id": 11,
+      "object": "garlic bulb",
+      "action": "in",
+      "time": "2026-09-12T14:54:12-04:00",
+      "run": "2026-09-12_14-54-09",
+      "video": "fridge.mp4",
+      "video_item_id": 3,
+      "time_s": 3.1,
+      "confidence": 0.76
+    },
+    {
+      "item_id": 12,
+      "object": "chili flakes jar",
+      "action": "in",
+      "time": "2026-09-12T14:54:13-04:00",
+      "run": "2026-09-12_14-54-09",
+      "video": "fridge.mp4",
+      "video_item_id": 4,
+      "time_s": 4.4,
+      "confidence": 0.75
+    },
+    {
+      "item_id": 13,
+      "object": "parsley bunch",
+      "action": "in",
+      "time": "2026-09-12T14:54:19-04:00",
+      "run": "2026-09-12_14-54-09",
+      "video": "fridge.mp4",
+      "video_item_id": 5,
+      "time_s": 10.1,
+      "confidence": 0.76
+    },
+    {
+      "item_id": 14,
+      "object": "salt container",
+      "action": "in",
+      "time": "2026-09-12T14:54:20-04:00",
+      "run": "2026-09-12_14-54-09",
+      "video": "fridge.mp4",
+      "video_item_id": 6,
+      "time_s": 11.4,
+      "confidence": 0.75
+    },
+    {
+      "item_id": 15,
+      "object": "parmesan cheese",
+      "action": "in",
+      "time": "2026-09-12T14:54:21-04:00",
+      "run": "2026-09-12_14-54-09",
+      "video": "fridge.mp4",
+      "video_item_id": 7,
+      "time_s": 12.8,
+      "confidence": 0.74
+    }
+  ]
+}

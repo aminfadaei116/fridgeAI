@@ -223,3 +223,6 @@ backend/api_key/*
 
 # Local experiment runs (backend/pipeline.sh)
 backend/experiments/
+
+# Synced copy of backend/experiments/ for the static site (frontend/scripts/sync.mjs)
+frontend/public/data/

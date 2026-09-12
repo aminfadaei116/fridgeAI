@@ -1,0 +1,270 @@
+{
+  "generated_at": "2026-09-12T14:54:27-04:00",
+  "model": "gemini-3.8-flash",
+  "inventory": "experiments/experiment1/inventory.json",
+  "expire": "experiments/experiment1/expire.json",
+  "available": [
+    {
+      "item_id": 1,
+      "object": "pasta box",
+      "hours_left": 71.8,
+      "status": "ok"
+    },
+    {
+      "item_id": 9,
+      "object": "pasta box",
+      "hours_left": 72.0,
+      "status": "ok"
+    },
+    {
+      "item_id": 4,
+      "object": "jar of chili flakes",
+      "hours_left": 95.8,
+      "status": "ok"
+    },
+    {
+      "item_id": 12,
+      "object": "chili flakes jar",
+      "hours_left": 96.0,
+      "status": "ok"
+    },
+    {
+      "item_id": 5,
+      "object": "bunch of parsley",
+      "hours_left": 119.8,
+      "status": "ok"
+    },
+    {
+      "item_id": 13,
+      "object": "parsley bunch",
+      "hours_left": 120.0,
+      "status": "ok"
+    },
+    {
+      "item_id": 7,
+      "object": "block of cheese",
+      "hours_left": 167.8,
+      "status": "ok"
+    },
+    {
+      "item_id": 3,
+      "object": "garlic bulb",
+      "hours_left": 719.8,
+      "status": "ok"
+    },
+    {
+      "item_id": 8,
+      "object": "snack bar",
+      "hours_left": 719.9,
+      "status": "ok"
+    },
+    {
+      "item_id": 11,
+      "object": "garlic bulb",
+      "hours_left": 720.0,
+      "status": "ok"
+    },
+    {
+      "item_id": 15,
+      "object": "parmesan cheese",
+      "hours_left": 720.0,
+      "status": "ok"
+    },
+    {
+      "item_id": 2,
+      "object": "olive oil bottle",
+      "hours_left": null,
+      "status": "unknown"
+    },
+    {
+      "item_id": 6,
+      "object": "canister of salt",
+      "hours_left": null,
+      "status": "unknown"
+    },
+    {
+      "item_id": 10,
+      "object": "olive oil bottle",
+      "hours_left": null,
+      "status": "unknown"
+    },
+    {
+      "item_id": 14,
+      "object": "salt container",
+      "hours_left": null,
+      "status": "unknown"
+    }
+  ],
+  "excluded_expired": [],
+  "use_first": [],
+  "recipes": [
+    {
+      "name": "Classic Spaghetti Aglio e Olio",
+      "description": "A fragrant Italian staple highlighting garlic, chili, and fresh parsley gently emulsified with pasta water and olive oil.",
+      "uses_fridge_items": [
+        "pasta box",
+        "garlic bulb",
+        "olive oil bottle",
+        "jar of chili flakes",
+        "bunch of parsley",
+        "parmesan cheese",
+        "canister of salt"
+      ],
+      "uses_expiring_items": [],
+      "pantry_items": [
+        "black pepper"
+      ],
+      "servings": 2,
+      "prep_time_min": 10,
+      "cook_time_min": 15,
+      "ingredients": [
+        {
+          "item": "pasta box",
+          "amount": "250 g"
+        },
+        {
+          "item": "garlic bulb",
+          "amount": "4 cloves, thinly sliced"
+        },
+        {
+          "item": "olive oil bottle",
+          "amount": "4 tbsp"
+        },
+        {
+          "item": "jar of chili flakes",
+          "amount": "1/2 tsp"
+        },
+        {
+          "item": "bunch of parsley",
+          "amount": "3 tbsp, finely chopped"
+        },
+        {
+          "item": "parmesan cheese",
+          "amount": "1/4 cup, freshly grated"
+        },
+        {
+          "item": "canister of salt",
+          "amount": "1 tbsp for boiling water, plus a pinch to taste"
+        },
+        {
+          "item": "black pepper",
+          "amount": "1/4 tsp"
+        }
+      ],
+      "steps": [
+        "Bring a large pot of water to a boil and season generously with salt from the canister.",
+        "Add pasta from the box and cook until al dente, reserving 1/2 cup of the starchy cooking water before draining.",
+        "While pasta is cooking, heat olive oil in a wide skillet over medium-low heat.",
+        "Add thinly sliced garlic and chili flakes, cooking gently for 2 to 3 minutes until the garlic is golden and aromatic without burning.",
+        "Transfer drained pasta directly into the skillet along with 1/4 cup of the reserved pasta water.",
+        "Toss vigorously over medium heat until a glossy sauce coats the strands.",
+        "Remove from heat, fold in the chopped parsley and black pepper, and serve topped with grated parmesan cheese."
+      ]
+    },
+    {
+      "name": "Crispy Garlic and Herb Cheese Toast",
+      "description": "A comforting, golden stovetop melt topped with savory melted cheese and aromatic garlic butter. We assume the block of cheese is a firm melting cheese such as cheddar or gouda.",
+      "uses_fridge_items": [
+        "block of cheese",
+        "garlic bulb",
+        "parsley bunch",
+        "salt container"
+      ],
+      "uses_expiring_items": [],
+      "pantry_items": [
+        "bread",
+        "butter for frying",
+        "black pepper"
+      ],
+      "servings": 2,
+      "prep_time_min": 10,
+      "cook_time_min": 10,
+      "ingredients": [
+        {
+          "item": "bread",
+          "amount": "4 thick slices"
+        },
+        {
+          "item": "block of cheese",
+          "amount": "120 g, grated"
+        },
+        {
+          "item": "garlic bulb",
+          "amount": "2 cloves, finely minced"
+        },
+        {
+          "item": "parsley bunch",
+          "amount": "2 tbsp, finely minced"
+        },
+        {
+          "item": "butter for frying",
+          "amount": "3 tbsp, softened"
+        },
+        {
+          "item": "salt container",
+          "amount": "1/4 tsp"
+        },
+        {
+          "item": "black pepper",
+          "amount": "1/8 tsp"
+        }
+      ],
+      "steps": [
+        "In a small bowl, mix softened butter with minced garlic, chopped parsley, salt, and black pepper.",
+        "Spread the garlic herb butter evenly over one side of each bread slice.",
+        "Heat a non-stick skillet over medium heat.",
+        "Place the bread slices butter-side down into the hot skillet.",
+        "Distribute the grated cheese evenly over the tops of the slices.",
+        "Cover the skillet with a lid and cook for 3 to 4 minutes until the bottom is toasted and the cheese is fully melted.",
+        "Remove lid, fold slices together to make sandwiches (or serve open-faced), slice diagonally, and enjoy hot."
+      ]
+    },
+    {
+      "name": "Caramelized Snack Bar Skillet Crumble",
+      "description": "A sweet, warm breakfast or dessert skillet made with caramelized bread bites and crunchy crumble. We assume the snack bar is an oat and honey grain bar.",
+      "uses_fridge_items": [
+        "snack bar",
+        "canister of salt"
+      ],
+      "uses_expiring_items": [],
+      "pantry_items": [
+        "bread",
+        "butter for frying",
+        "sugar"
+      ],
+      "servings": 1,
+      "prep_time_min": 5,
+      "cook_time_min": 8,
+      "ingredients": [
+        {
+          "item": "snack bar",
+          "amount": "1 bar (approx. 40 g), coarsely crushed"
+        },
+        {
+          "item": "bread",
+          "amount": "2 slices, cut into 1/2-inch cubes"
+        },
+        {
+          "item": "butter for frying",
+          "amount": "2 tbsp"
+        },
+        {
+          "item": "sugar",
+          "amount": "1.5 tbsp"
+        },
+        {
+          "item": "canister of salt",
+          "amount": "1 pinch"
+        }
+      ],
+      "steps": [
+        "Melt 1 tablespoon of butter in a skillet over medium heat.",
+        "Add the bread cubes and toast, tossing frequently, until lightly browned on all sides, about 3 to 4 minutes.",
+        "Push bread cubes to one side of the skillet and melt the remaining tablespoon of butter on the other side.",
+        "Add the sugar, pinch of salt, and the crushed snack bar into the melted butter, stirring for 1 to 2 minutes until bubbly and caramelized.",
+        "Toss the toasted bread cubes thoroughly in the sweet crumble mixture to coat evenly.",
+        "Transfer to a bowl and let cool for 2 minutes to allow the topping to crisp up before serving."
+      ]
+    }
+  ]
+}

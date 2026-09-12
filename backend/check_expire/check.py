@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 """Check which fridge items are close to going bad.
 
-    cd backend && python -m check_expire.check --database db/expire.json --experiment experiments/<run> [--threshold-hours 48]
+    cd backend && python -m check_expire.check --database db/expire.json --experiment experiments/<name> [--threshold-hours 48]
 
-Reads <experiment>/inventory.json (written by detection/detect.py) and the shelf-life database
-(hours an item keeps in the fridge), then writes <experiment>/expire.json and prints it:
+Reads <experiment>/inventory.json (the cumulative one kept by inventory/update.py) and the shelf-life
+database (hours an item keeps in the fridge), then writes <experiment>/expire.json and prints it:
 
     {
       "checked_at": "2026-09-14T09:00:00-04:00",
       "threshold_hours": 48,
-      "inventory": "experiments/2026-09-12_13-28-51/inventory.json",
+      "inventory": "experiments/experiment1/inventory.json",
       "items": [
         {"item_id": 1, "object": "milk carton", "matched": "milk", "shelf_life_hours": 168,
          "entered_at": "2026-09-12T13:28:53-04:00", "expires_at": "2026-09-19T13:28:53-04:00",
@@ -19,7 +19,8 @@ Reads <experiment>/inventory.json (written by detection/detect.py) and the shelf
     }
 
 status: "expired" (hours_left <= 0), "expiring_soon" (<= threshold), else "ok".
-Items are sorted most-urgent first. entered_at = inventory recorded_at + entered_at_s.
+Items are sorted most-urgent first. entered_at is taken from the inventory entry; for a raw
+detect.py inventory (per-video, no entered_at) it is recorded_at + entered_at_s instead.
 
 Name matching is offline and heuristic (inventory names are model-generated, db keys are canonical):
 names are lower-cased, singularised and stripped of packaging words; then
@@ -35,6 +36,7 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import functools
 import json
 import re
 import sys
@@ -161,8 +163,16 @@ def iso(d: dt.datetime) -> str:
 # Report
 # ---------------------------------------------------------------------------
 
-def build_report(inventory: dict, db: list, recorded_at: dt.datetime, now: dt.datetime,
+def entered_at_for(entry: dict, recorded_at) -> dt.datetime:
+    """Cumulative inventory entries carry an absolute entered_at; raw detect.py ones an offset."""
+    if entry.get("entered_at"):
+        return parse_datetime(entry["entered_at"])
+    return recorded_at() + dt.timedelta(seconds=float(entry.get("entered_at_s") or 0))
+
+
+def build_report(inventory: dict, db: list, recorded_at, now: dt.datetime,
                  threshold_hours: float, inventory_label: str) -> dict:
+    """recorded_at is a zero-arg callable, only invoked for entries without an absolute entered_at."""
     items, unknown = [], []
     for entry in inventory.get("in_fridge", []):
         found = match(entry["object"], db)
@@ -170,7 +180,7 @@ def build_report(inventory: dict, db: list, recorded_at: dt.datetime, now: dt.da
             unknown.append({"item_id": entry["item_id"], "object": entry["object"]})
             continue
         key, shelf_life = found
-        entered_at = recorded_at + dt.timedelta(seconds=float(entry.get("entered_at_s") or 0))
+        entered_at = entered_at_for(entry, recorded_at)
         expires_at = entered_at + dt.timedelta(hours=shelf_life)
         hours_left = (expires_at - now).total_seconds() / 3600
         if hours_left <= 0:
@@ -243,7 +253,6 @@ def main(argv: list[str] | None = None) -> int:
     try:
         db = load_database(args.database.expanduser().resolve())
         inventory = json.loads(inventory_path.read_text(encoding="utf-8"))
-        recorded_at = recorded_at_for(inventory, experiment, inventory_path)
     except (RuntimeError, ValueError, OSError) as e:
         print(f"error: {e}", file=sys.stderr)
         return 1
@@ -254,7 +263,13 @@ def main(argv: list[str] | None = None) -> int:
     except ValueError:
         label = str(inventory_path)
 
-    report = build_report(inventory, db, recorded_at, now, args.threshold_hours, label)
+    # Only needed (and only computed, once) for a raw per-video inventory whose entries lack entered_at.
+    recorded_at = functools.cache(lambda: recorded_at_for(inventory, experiment, inventory_path))
+    try:
+        report = build_report(inventory, db, recorded_at, now, args.threshold_hours, label)
+    except (ValueError, KeyError, OSError) as e:
+        print(f"error: bad inventory {inventory_path}: {e}", file=sys.stderr)
+        return 1
 
     for item in report["items"]:
         print(f"check: {item['object']!r} -> {item['matched']!r} ({item['shelf_life_hours']} h): "

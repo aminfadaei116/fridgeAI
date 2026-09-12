@@ -4,7 +4,10 @@
     cd backend && python -m detection.detect --video path/to/video.mov [--model M] [--fps N] [--out-dir DIR]
 
 Writes two JSON files into --out-dir (default: a new backend/experiments/<YYYY-MM-DD_HH-MM-SS>/ folder).
-Normally launched via backend/pipeline.sh, which also captures run.log there.
+Normally launched via backend/pipeline.sh, which points --out-dir at
+backend/experiments/<EXPERIMENT>/runs/<stamp>/, captures run.log there, and then folds events.json
+into the experiment's cumulative inventory with inventory/update.py. Both files here describe this
+one video only; item_id is per video and time_s is an offset into it.
 
 1. events.json: which objects entered/exited the fridge and when.
 

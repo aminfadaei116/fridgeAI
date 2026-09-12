@@ -1,0 +1,135 @@
+{
+  "checked_at": "2026-09-12T14:54:15-04:00",
+  "threshold_hours": 48,
+  "inventory": "experiments/experiment1/inventory.json",
+  "items": [
+    {
+      "item_id": 1,
+      "object": "pasta box",
+      "matched": "fresh pasta",
+      "shelf_life_hours": 72,
+      "entered_at": "2026-09-12T14:44:52-04:00",
+      "expires_at": "2026-09-15T14:44:52-04:00",
+      "hours_left": 71.8,
+      "status": "ok"
+    },
+    {
+      "item_id": 9,
+      "object": "pasta box",
+      "matched": "fresh pasta",
+      "shelf_life_hours": 72,
+      "entered_at": "2026-09-12T14:54:09-04:00",
+      "expires_at": "2026-09-15T14:54:09-04:00",
+      "hours_left": 72.0,
+      "status": "ok"
+    },
+    {
+      "item_id": 4,
+      "object": "jar of chili flakes",
+      "matched": "chili",
+      "shelf_life_hours": 96,
+      "entered_at": "2026-09-12T14:44:56-04:00",
+      "expires_at": "2026-09-16T14:44:56-04:00",
+      "hours_left": 95.8,
+      "status": "ok"
+    },
+    {
+      "item_id": 12,
+      "object": "chili flakes jar",
+      "matched": "chili",
+      "shelf_life_hours": 96,
+      "entered_at": "2026-09-12T14:54:13-04:00",
+      "expires_at": "2026-09-16T14:54:13-04:00",
+      "hours_left": 96.0,
+      "status": "ok"
+    },
+    {
+      "item_id": 5,
+      "object": "bunch of parsley",
+      "matched": "parsley",
+      "shelf_life_hours": 120,
+      "entered_at": "2026-09-12T14:45:02-04:00",
+      "expires_at": "2026-09-17T14:45:02-04:00",
+      "hours_left": 119.8,
+      "status": "ok"
+    },
+    {
+      "item_id": 13,
+      "object": "parsley bunch",
+      "matched": "parsley",
+      "shelf_life_hours": 120,
+      "entered_at": "2026-09-12T14:54:19-04:00",
+      "expires_at": "2026-09-17T14:54:19-04:00",
+      "hours_left": 120.0,
+      "status": "ok"
+    },
+    {
+      "item_id": 7,
+      "object": "block of cheese",
+      "matched": "cheese",
+      "shelf_life_hours": 168,
+      "entered_at": "2026-09-12T14:45:04-04:00",
+      "expires_at": "2026-09-19T14:45:04-04:00",
+      "hours_left": 167.8,
+      "status": "ok"
+    },
+    {
+      "item_id": 3,
+      "object": "garlic bulb",
+      "matched": "garlic",
+      "shelf_life_hours": 720,
+      "entered_at": "2026-09-12T14:44:55-04:00",
+      "expires_at": "2026-10-12T14:44:55-04:00",
+      "hours_left": 719.8,
+      "status": "ok"
+    },
+    {
+      "item_id": 8,
+      "object": "snack bar",
+      "matched": "snack bar",
+      "shelf_life_hours": 720,
+      "entered_at": "2026-09-12T14:45:19-04:00",
+      "expires_at": "2026-10-12T14:45:19-04:00",
+      "hours_left": 719.9,
+      "status": "ok"
+    },
+    {
+      "item_id": 11,
+      "object": "garlic bulb",
+      "matched": "garlic",
+      "shelf_life_hours": 720,
+      "entered_at": "2026-09-12T14:54:12-04:00",
+      "expires_at": "2026-10-12T14:54:12-04:00",
+      "hours_left": 720.0,
+      "status": "ok"
+    },
+    {
+      "item_id": 15,
+      "object": "parmesan cheese",
+      "matched": "parmesan cheese",
+      "shelf_life_hours": 720,
+      "entered_at": "2026-09-12T14:54:21-04:00",
+      "expires_at": "2026-10-12T14:54:21-04:00",
+      "hours_left": 720.0,
+      "status": "ok"
+    }
+  ],
+  "unknown": [
+    {
+      "item_id": 2,
+      "object": "olive oil bottle"
+    },
+    {
+      "item_id": 6,
+      "object": "canister of salt"
+    },
+    {
+      "item_id": 10,
+      "object": "olive oil bottle"
+    },
+    {
+      "item_id": 14,
+      "object": "salt container"
+    }
+  ]
+}

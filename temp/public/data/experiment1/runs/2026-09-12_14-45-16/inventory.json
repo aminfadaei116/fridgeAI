@@ -1,0 +1,14 @@
+{
+  "video": "test.mp4",
+  "recorded_at": "2026-09-12T14:45:17-04:00",
+  "model": "gemini-3.8-flash",
+  "in_fridge": [
+    {
+      "item_id": 1,
+      "object": "snack bar",
+      "entered_at_s": 2.4,
+      "timestamp": "00:02"
+    }
+  ],
+  "removed": []
+}

@@ -1,18 +1,14 @@
-// Savor: a read-only viewer for backend/pipeline.sh output, served live by frontend/serve.py.
-// /api/experiments lists the experiment folders; /api/experiments/<name> returns that folder's
-// inventory.json, expire.json, recipes.json and events.json in one document. The page polls it
-// and re-renders when the folder changes, so re-running the pipeline shows up by itself.
-// Pick an experiment with ?experiment=<name>; the view is in the hash (#inventory, #recipes, #activity).
+// Savor: a read-only viewer for backend/pipeline.sh output.
+// Data comes from ./data/<experiment>/{inventory,expire,recipes,events}.json, copied there by
+// `npm run sync` (scripts/sync.mjs). ./data/index.json lists the experiments available.
+// Pick one with ?experiment=<name>; the view is in the hash (#inventory, #recipes, #activity).
 
-const STEPS_KEY = 'savor-steps-v3';
-const POLL_MS = 5000;        // how often to ask the server whether the experiment folder changed
-const TICK_MS = 60000;       // how often to recompute "hours left" from expires_at without new data
+const STEPS_KEY = 'savor-steps-v2';
 const VIEWS = ['home', 'inventory', 'recipes', 'activity'];
 const STATUS_ORDER = { expired: 0, expiring_soon: 1, ok: 2, unknown: 3 };
 const STATUS_PILL = { expired: 'urgent', expiring_soon: 'soon', ok: 'fresh', unknown: 'unknown' };
 const RECIPE_COLORS = ['#c56c40', '#d57672', '#d49a3f', '#5f8a5a', '#8a6fb5'];
-// Fallback emoji by keyword, used only when an item has no icon in backend/db/images
-// (i.e. check.py found no shelf-life match). Earlier entries win, so "chili" sits above "jar".
+// Emoji by keyword; earlier entries win, so the specific ones ("chili") sit above generic containers ("jar").
 const EMOJI = [
   ['pasta', '🍝'], ['spaghetti', '🍝'], ['noodle', '🍜'], ['rice', '🍚'], ['bread', '🍞'], ['toast', '🍞'],
   ['oil', '🫒'], ['olive', '🫒'], ['butter', '🧈'], ['garlic', '🧄'], ['onion', '🧅'], ['chili', '🌶️'], ['pepper', '🫑'],
@@ -28,10 +24,8 @@ const EMOJI = [
 ];
 
 const state = {
-  index: null,          // /api/experiments
-  icons: {},            // db/images/index.json items: shelf-life key -> {file, emoji}
+  index: null,          // ./data/index.json
   experiment: null,     // name currently shown
-  raw: null,            // last /api/experiments/<name> document
   data: null,           // joined model, see buildModel()
   loading: true,
   error: null,
@@ -39,11 +33,8 @@ const state = {
   filter: 'All',
   query: '',
   doneSteps: loadSteps(),
-  lastPoll: null,
 };
 let toastTimer;
-let pollTimer;
-let tickTimer;
 const app = document.querySelector('#app');
 const modalRoot = document.querySelector('#modalRoot');
 
@@ -79,19 +70,11 @@ function expiryLabel(item) {
 function urgency(a, b) {
   return (STATUS_ORDER[a.status] - STATUS_ORDER[b.status]) || ((a.hoursLeft ?? Infinity) - (b.hoursLeft ?? Infinity)) || (a.item_id - b.item_id);
 }
-function apiUrl(name) { return `/api/experiments/${encodeURIComponent(name)}`; }
-function fileUrl(file) { return `${apiUrl(state.experiment)}/files/${file.split('/').map(encodeURIComponent).join('/')}`; }
-
-// Icon for a food: the Fluent Emoji PNG for its shelf-life key when check.py matched one, else a keyword emoji.
-function iconFile(matched) { return matched && state.icons[matched] ? state.icons[matched].file : null; }
-function iconHtml(subject, extraClass = '') {
-  const file = iconFile(subject.matched);
-  if (file) return `<span class="food-icon is-img ${extraClass}"><img src="/images/${encodeURIComponent(file)}" alt=""></span>`;
-  return `<span class="food-icon ${extraClass}">${emojiFor(subject.object)}</span>`;
-}
+function dataPath(file) { return `./data/${encodeURIComponent(state.experiment)}/${file}`; }
 
 // ---------- data ----------
 
+// Wrangler's SPA fallback answers missing files with index.html, so a 200 is not proof of JSON.
 async function fetchJson(path) {
   try {
     const res = await fetch(path, { cache: 'no-store' });
@@ -102,18 +85,16 @@ async function fetchJson(path) {
 async function fetchText(path) {
   try {
     const res = await fetch(path, { cache: 'no-store' });
-    if (!res.ok) return null;
+    if (!res.ok || (res.headers.get('content-type') || '').includes('text/html')) return null;
     return await res.text();
   } catch { return null; }
 }
 
 // Join the four pipeline files into one object the views can read directly.
-function buildModel(doc) {
-  const { name, inventory, expire, recipes, events } = doc;
+function buildModel(name, inventory, expire, recipes, events) {
   const now = Date.now();
   const threshold = expire?.threshold_hours ?? 48;
   const expiryById = new Map((expire?.items || []).map(entry => [entry.item_id, entry]));
-  const matchedById = new Map((expire?.items || []).map(entry => [entry.item_id, entry.matched]));
 
   // hours_left in expire.json is as of checked_at; recompute from expires_at so the page stays honest over time.
   const items = (inventory.in_fridge || []).map(raw => {
@@ -127,6 +108,7 @@ function buildModel(doc) {
     }
     return {
       ...raw,
+      emoji: emojiFor(raw.object),
       matched: entry?.matched ?? null,
       shelfLifeHours: entry?.shelf_life_hours ?? null,
       expiresAt: entry?.expires_at ?? null,
@@ -141,8 +123,6 @@ function buildModel(doc) {
   const recipeList = (recipes?.recipes || []).map((recipe, index) => {
     const fridge = (recipe.uses_fridge_items || []).map(itemName => ({ name: itemName, item: byName.get(itemName.toLowerCase()) || null }));
     const fridgeNames = new Set(fridge.map(f => f.name.toLowerCase()));
-    const pantryNames = new Set((recipe.pantry_items || []).map(p => String(p).toLowerCase()));
-    const urgentNames = new Set((recipe.uses_expiring_items || []).map(n => String(n).toLowerCase()));
     return {
       ...recipe,
       id: `r${index}`,
@@ -152,12 +132,7 @@ function buildModel(doc) {
       total: fridge.length,
       urgent: (recipe.uses_expiring_items || []).length,
       totalMin: (recipe.prep_time_min || 0) + (recipe.cook_time_min || 0),
-      // An ingredient is labelled only when its name is exactly a fridge item or a declared pantry staple.
-      ingredients: (recipe.ingredients || []).map(ing => {
-        const key = String(ing.item).toLowerCase();
-        const source = fridgeNames.has(key) ? 'fridge' : pantryNames.has(key) ? 'pantry' : null;
-        return { ...ing, source, fridgeItem: byName.get(key) || null, urgent: urgentNames.has(key) };
-      }),
+      ingredients: (recipe.ingredients || []).map(ing => ({ ...ing, fromFridge: fridgeNames.has(String(ing.item).toLowerCase()), emoji: emojiFor(ing.item) })),
     };
   }).sort((a, b) => (b.urgent - a.urgent) || (b.matched - a.matched) || (a.id < b.id ? -1 : 1));
 
@@ -167,7 +142,6 @@ function buildModel(doc) {
   return {
     name,
     updatedAt: inventory.updated_at,
-    folderUpdatedAt: doc.updated_at,
     checkedAt: expire?.checked_at ?? null,
     generatedAt: recipes?.generated_at ?? null,
     model: recipes?.model || events?.runs?.[0]?.model || null,
@@ -179,20 +153,9 @@ function buildModel(doc) {
     useFirst: recipes?.use_first || [],
     excludedExpired: recipes?.excluded_expired || [],
     runs: [...(events?.runs || [])].sort((a, b) => Date.parse(b.recorded_at) - Date.parse(a.recorded_at)),
-    events: [...(events?.events || [])].map(event => ({ ...event, matched: matchedById.get(event.item_id) ?? null })).sort((a, b) => Date.parse(b.time) - Date.parse(a.time)),
+    events: [...(events?.events || [])].map(event => ({ ...event, emoji: emojiFor(event.object) })).sort((a, b) => Date.parse(b.time) - Date.parse(a.time)),
     missing: [['expire.json', expire], ['recipes.json', recipes], ['events.json', events]].filter(([, value]) => !value).map(([file]) => file),
   };
-}
-
-function applyDoc(doc) {
-  state.raw = doc;
-  if (!doc.inventory) {
-    state.data = null;
-    state.error = `“${escapeHtml(doc.name)}” has no inventory.json yet. Run <code>bash backend/pipeline.sh VIDEO ${escapeHtml(doc.name)}</code>.`;
-  } else {
-    state.data = buildModel(doc);
-    state.error = null;
-  }
 }
 
 async function loadExperiment(name) {
@@ -200,38 +163,32 @@ async function loadExperiment(name) {
   state.loading = true;
   state.error = null;
   state.data = null;
-  state.raw = null;
   state.filter = 'All';
   state.query = '';
   render();
-  const doc = await fetchJson(apiUrl(name));
+  const [inventory, expire, recipes, events] = await Promise.all(['inventory.json', 'expire.json', 'recipes.json', 'events.json'].map(file => fetchJson(dataPath(file))));
   if (state.experiment !== name) return; // user switched again while this was in flight
-  if (!doc) state.error = `Could not load “${escapeHtml(name)}”. Is <code>frontend/serve.py</code> still running?`;
-  else applyDoc(doc);
+  if (!inventory) state.error = `No inventory.json for “${name}”. Run <code>npm run sync</code> in frontend/ after the pipeline finishes.`;
+  else state.data = buildModel(name, inventory, expire, recipes, events);
   state.loading = false;
   render();
 }
 
 async function boot() {
-  const [index, icons] = await Promise.all([fetchJson('/api/experiments'), fetchJson('/images/index.json')]);
-  state.index = index;
-  state.icons = icons?.items || {};
+  state.index = await fetchJson('./data/index.json');
   const requested = new URLSearchParams(location.search).get('experiment');
   const hash = location.hash.replace('#', '');
   if (VIEWS.includes(hash)) state.view = hash;
   const names = (state.index?.experiments || []).map(e => e.name);
-  const name = requested && names.includes(requested) ? requested : (state.index?.latest || names[0] || null);
+  const name = requested && names.includes(requested) ? requested : (state.index?.latest || names[0] || requested);
   renderExperimentPicker();
-  startPolling();
   if (!name) {
     state.loading = false;
-    state.error = state.index
-      ? 'No experiments yet. Run <code>bash backend/pipeline.sh VIDEO EXPERIMENT</code> and this page will pick it up.'
-      : 'Could not reach the server. Start it with <code>python3 frontend/serve.py</code> and open the address it prints.';
+    state.error = 'No experiments synced yet. Run <code>backend/pipeline.sh VIDEO EXPERIMENT</code>, then <code>npm run sync</code> in frontend/.';
     render();
     return;
   }
-  if (requested && requested !== name) showToast(`No experiment “${requested}”, showing ${name}`);
+  if (requested && !names.includes(requested) && names.length) showToast(`No experiment “${requested}”, showing ${name}`);
   await loadExperiment(name);
 }
 
@@ -242,45 +199,6 @@ function setExperiment(name) {
   loadExperiment(name);
 }
 
-// Re-rendering while the user is typing in the search box would drop their caret; wait for the next poll instead.
-function canRerender() { return document.activeElement?.id !== 'inventorySearch'; }
-
-// Every POLL_MS: has the experiment list or the current folder changed on disk?
-async function poll() {
-  const index = await fetchJson('/api/experiments');
-  state.lastPoll = new Date().toISOString();
-  if (index) {
-    const before = JSON.stringify(state.index?.experiments || []);
-    state.index = index;
-    if (JSON.stringify(index.experiments) !== before) renderExperimentPicker();
-    if (!state.experiment && index.latest) { loadExperiment(index.latest); return; }
-  }
-  if (!state.experiment || state.loading) return;
-  const doc = await fetchJson(apiUrl(state.experiment));
-  if (!doc || doc.name !== state.experiment) return;
-  if (state.raw && doc.updated_at === state.raw.updated_at) return;
-  const hadData = Boolean(state.data);
-  applyDoc(doc);
-  if (canRerender()) {
-    render();
-    if (hadData) showToast(`${doc.name} updated ${fmtClock(doc.updated_at)}`);
-  }
-}
-
-// Every TICK_MS: same data, fresh clock, so "hours left" and "expired" flip on time.
-function tick() {
-  if (!state.raw?.inventory || !canRerender()) return;
-  state.data = buildModel(state.raw);
-  render();
-}
-
-function startPolling() {
-  clearInterval(pollTimer);
-  clearInterval(tickTimer);
-  pollTimer = setInterval(poll, POLL_MS);
-  tickTimer = setInterval(tick, TICK_MS);
-}
-
 // ---------- fragments ----------
 
 function pill(item) { return `<span class="expiry ${STATUS_PILL[item.status]}">${expiryLabel(item)}</span>`; }
@@ -288,17 +206,12 @@ function pill(item) { return `<span class="expiry ${STATUS_PILL[item.status]}">$
 function foodRow(item, compact = false) {
   const name = escapeHtml(item.object);
   if (compact) {
-    return `<button class="food-row" data-action="open-item" data-id="${item.item_id}">${iconHtml(item)}<span class="food-copy"><strong>${name}</strong><small>${item.matched ? `as “${escapeHtml(item.matched)}”` : 'not in shelf-life database'} · in ${fmtDate(item.entered_at)}</small></span>${pill(item)}</button>`;
+    return `<button class="food-row" data-action="open-item" data-id="${item.item_id}"><span class="food-icon">${item.emoji}</span><span class="food-copy"><strong>${name}</strong><small>${item.matched ? `as “${escapeHtml(item.matched)}”` : 'not in shelf-life database'} · seen ${fmtDate(item.entered_at)}</small></span>${pill(item)}</button>`;
   }
-  return `<button class="inventory-item" data-action="open-item" data-id="${item.item_id}">${iconHtml(item)}<span class="food-copy"><strong>${name}</strong><small>${item.matched ? `${escapeHtml(item.matched)} · ${item.shelfLifeHours} h shelf life${item.expiresAt ? ` · expires ${fmtDate(item.expiresAt)}` : ''}` : 'not in shelf-life database'}</small></span><span class="item-qty">#${item.item_id} · ${pct(item.confidence)}<small>in ${fmtDate(item.entered_at)}</small></span>${pill(item)}<i class="row-chevron">›</i></button>`;
+  return `<button class="inventory-item" data-action="open-item" data-id="${item.item_id}"><span class="food-icon">${item.emoji}</span><span class="food-copy"><strong>${name}</strong><small>${item.matched ? `${escapeHtml(item.matched)} · ${item.shelfLifeHours} h shelf life` : 'not in shelf-life database'}</small></span><span class="item-qty">#${item.item_id} · ${pct(item.confidence)}<small>${fmtDate(item.entered_at)}</small></span>${pill(item)}<i class="row-chevron">›</i></button>`;
 }
 
-// Up to three icons of the fridge items a recipe uses, on top of its colour block.
-function iconCluster(recipe) {
-  const subjects = recipe.fridge.filter(f => f.item).slice(0, 3).map(f => f.item);
-  return subjects.length ? `<span class="icon-cluster">${subjects.map(s => iconHtml(s)).join('')}</span>` : '';
-}
-function recipeArt(recipe) { const cluster = iconCluster(recipe); return `<div class="mini-recipe-art ${cluster ? 'has-icons' : ''}" style="--recipe-color:${recipe.color}">${cluster}</div>`; }
+function recipeArt(recipe) { return `<div class="mini-recipe-art" style="--recipe-color:${recipe.color}"></div>`; }
 
 function recipeMeta(recipe) {
   return `<span class="recipe-meta"><span>◷ ${recipe.totalMin} min</span><span>◌ ${plural(recipe.servings, 'serving')}</span>${recipe.pantry_items?.length ? `<span>＋ ${plural(recipe.pantry_items.length, 'pantry item')}</span>` : ''}</span>`;
@@ -328,7 +241,6 @@ function renderHome() {
     headline = 'Nothing in the fridge yet.';
     copy = 'Run the pipeline on a video and everything it spots will show up here.';
   }
-  const featuredCluster = featured ? iconCluster(featured) : '';
   return `
     <section class="page-heading">
       <div><p class="eyebrow">Experiment · ${escapeHtml(d.name)}</p><h1>Make the good stuff<br>last longer.</h1><p>Inventory updated ${fmtDate(d.updatedAt)} · ${plural(d.runs.length, 'scan')}${d.model ? ` · ${escapeHtml(d.model)}` : ''}</p></div>
@@ -359,7 +271,7 @@ function renderHome() {
           </div>
         </article>
         ${featured ? `<article class="panel plan-card">
-          <div class="recipe-image ${featuredCluster ? 'has-icons' : ''}" style="--recipe-color:${featured.color}">${featuredCluster}<span class="match">${featured.matched}/${featured.total} ingredients on hand</span></div>
+          <div class="recipe-image" style="--recipe-color:${featured.color}"><span class="match">${featured.matched}/${featured.total} ingredients on hand</span></div>
           <div class="plan-copy"><p class="eyebrow">Tonight's idea</p><h3>${escapeHtml(featured.name)}</h3><p>${escapeHtml(featured.description)}</p><div class="section-top" style="margin:0">${recipeMeta(featured)}<button class="text-link" data-action="open-recipe" data-recipe="${featured.id}">Make it →</button></div></div>
         </article>` : `<article class="panel panel-pad">${emptyState('✦', 'No recipes yet', 'recipes.json was not found for this experiment.')}</article>`}
       </div>
@@ -386,30 +298,29 @@ function renderInventory() {
       <div class="filter-row">${Object.keys(FILTERS).map(name => `<button class="filter-pill ${state.filter === name ? 'is-active' : ''}" data-filter="${name}">${name} <b>${filterCounts[name]}</b></button>`).join('')}</div>
       <div class="inventory-list">${items.length ? items.map(item => foodRow(item)).join('') : emptyState('⌕', 'Nothing matches that', d.counts.total ? 'Try another search or filter.' : 'The pipeline has not put anything in this fridge yet.')}</div>
     </section>
-    ${d.counts.unknown ? `<section class="panel note-card"><span class="tip-icon">?</span><div><h2 class="section-title">${plural(d.counts.unknown, 'item')} without a shelf life</h2><p>${d.items.filter(item => item.status === 'unknown').map(item => escapeHtml(item.object)).join(', ')} did not match anything in <code>backend/db/expire.json</code>. Add an alias there and re-run <code>python -m check_expire.check --experiment experiments/${escapeHtml(d.name)}</code> from backend/ to track ${d.counts.unknown === 1 ? 'it' : 'them'}.</p></div></section>` : ''}
-    ${d.removed.length ? `<section class="panel panel-pad"><div class="section-top"><h2 class="section-title">Taken out</h2><span class="date-chip">${plural(d.removed.length, 'item')}</span></div><div class="food-list">${d.removed.map(item => `<div class="food-row is-static">${iconHtml(item)}<span class="food-copy"><strong>${escapeHtml(item.object)}</strong><small>${item.entered_at ? `in ${fmtDate(item.entered_at)} · ` : 'never seen going in · '}out ${fmtDate(item.removed_at)}</small></span><span class="badge out">out</span></div>`).join('')}</div></section>` : ''}`;
+    ${d.counts.unknown ? `<section class="panel note-card"><span class="tip-icon">?</span><div><h2 class="section-title">${plural(d.counts.unknown, 'item')} without a shelf life</h2><p>${d.items.filter(item => item.status === 'unknown').map(item => escapeHtml(item.object)).join(', ')} did not match anything in <code>backend/db/expire.json</code>. Add an alias there and re-run <code>check_expire.check</code> to track ${d.counts.unknown === 1 ? 'it' : 'them'}.</p></div></section>` : ''}
+    ${d.removed.length ? `<section class="panel panel-pad"><div class="section-top"><h2 class="section-title">Taken out</h2><span class="date-chip">${plural(d.removed.length, 'item')}</span></div><div class="food-list">${d.removed.map(item => `<div class="food-row is-static"><span class="food-icon">${emojiFor(item.object)}</span><span class="food-copy"><strong>${escapeHtml(item.object)}</strong><small>${item.entered_at ? `in ${fmtDate(item.entered_at)} · ` : 'never seen going in · '}out ${fmtDate(item.removed_at)}</small></span><span class="badge out">out</span></div>`).join('')}</div></section>` : ''}`;
 }
 
 function renderRecipes() {
   const d = state.data;
   const featured = d.recipes[0];
-  const pantry = [...new Set(d.recipes.flatMap(recipe => recipe.pantry_items || []))];
   return `
     <section class="page-heading"><div><p class="eyebrow">Waste less, eat better</p><h1>What should we make?</h1><p>${plural(d.recipes.length, 'idea')} built around what the camera saw${d.model ? ` · ${escapeHtml(d.model)}` : ''}${d.generatedAt ? ` · ${fmtDate(d.generatedAt)}` : ''}.</p></div><span class="date-chip">✦ ${d.useFirst.length || 'No'} item${d.useFirst.length === 1 ? '' : 's'} to use first</span></section>
     <section class="plan-page-grid">
       <div class="panel panel-pad">
         <div class="section-top"><h2 class="section-title">Best matches</h2><span class="date-chip">Sorted by urgency</span></div>
-        <div class="recipe-list">${d.recipes.length ? d.recipes.map(recipe => `<article class="recipe-row">${recipeArt(recipe)}<div><h3>${escapeHtml(recipe.name)}</h3><p>${escapeHtml(recipe.description)}</p>${recipeMeta(recipe)}</div><div><div class="match-number">${recipe.matched}/${recipe.total} in fridge${recipe.urgent ? `<br><em>${plural(recipe.urgent, 'expiring item')}</em>` : ''}</div><button class="text-link" data-action="open-recipe" data-recipe="${recipe.id}">View recipe →</button></div></article>`).join('') : emptyState('✦', 'No recipes yet', `recipes.json was not found for this experiment. Run <code>python -m chef.chef --experiment experiments/${escapeHtml(d.name)}</code> from backend/.`)}</div>
+        <div class="recipe-list">${d.recipes.length ? d.recipes.map(recipe => `<article class="recipe-row">${recipeArt(recipe)}<div><h3>${escapeHtml(recipe.name)}</h3><p>${escapeHtml(recipe.description)}</p>${recipeMeta(recipe)}</div><div><div class="match-number">${recipe.matched}/${recipe.total} in fridge${recipe.urgent ? `<br><em>${plural(recipe.urgent, 'expiring item')}</em>` : ''}</div><button class="text-link" data-action="open-recipe" data-recipe="${recipe.id}">View recipe →</button></div></article>`).join('') : emptyState('✦', 'No recipes yet', 'recipes.json was not found for this experiment. Run <code>python -m chef.chef --experiment experiments/' + escapeHtml(d.name) + '</code> from backend/.')}</div>
       </div>
       <div class="stack">
-        <article class="panel tip-card"><span class="tip-icon">✦</span><h2>${d.useFirst.length ? 'Cook these before they turn.' : 'Food that gets used feels good.'}</h2><p>${d.useFirst.length ? `${d.useFirst.map(escapeHtml).join(', ')} ${d.useFirst.length === 1 ? 'is' : 'are'} inside the ${d.threshold} hour window, so the chef was told to build around ${d.useFirst.length === 1 ? 'it' : 'them'}.` : `Nothing is inside the ${d.threshold} hour window, so the chef was free to use anything in the fridge.`}</p>${featured ? `<button class="button" data-action="open-recipe" data-recipe="${featured.id}">Open the top match</button>` : ''}</article>
+        <article class="panel tip-card"><span class="tip-icon">✦</span><h2>${d.useFirst.length ? 'Cook these before they turn.' : 'Food that gets used feels good.'}</h2><p>${d.useFirst.length ? `${d.useFirst.map(escapeHtml).join(', ')} ${d.useFirst.length === 1 ? 'is' : 'are'} inside the ${d.threshold} hour window, so the chef was told to build around ${d.useFirst.length === 1 ? 'it' : 'them'}.` : `Nothing is inside the ${d.threshold} hour window, so the chef was free to use anything in the fridge.`}</p>${featured ? `<button class="button" data-action="open-recipe" data-recipe="${featured.id}">Plan tonight's meal</button>` : ''}</article>
         <article class="panel panel-pad">
           <div class="section-top"><h2 class="section-title">Chef notes</h2></div>
           <div class="setting-list">
             <div class="setting"><span>◌</span><span><strong>Model</strong><small>${escapeHtml(d.model || 'unknown')}</small></span></div>
             <div class="setting"><span>▦</span><span><strong>Ingredients offered</strong><small>${plural(d.counts.total - d.excludedExpired.length, 'item')} from the fridge${d.counts.unknown ? `, ${d.counts.unknown} with no shelf life` : ''}</small></span></div>
             <div class="setting"><span>✕</span><span><strong>Left out as expired</strong><small>${d.excludedExpired.length ? d.excludedExpired.map(escapeHtml).join(', ') : 'nothing'}</small></span></div>
-            <div class="setting"><span>＋</span><span><strong>Pantry staples assumed</strong><small>${pantry.map(escapeHtml).join(', ') || 'none'}</small></span></div>
+            <div class="setting"><span>＋</span><span><strong>Pantry staples assumed</strong><small>${[...new Set(d.recipes.flatMap(recipe => recipe.pantry_items || []))].map(escapeHtml).join(', ') || 'none'}</small></span></div>
           </div>
         </article>
       </div>
@@ -429,7 +340,7 @@ function renderActivity() {
         </article>
         <article class="panel panel-pad">
           <div class="section-top"><h2 class="section-title">Timeline</h2><span class="date-chip">${plural(d.events.length, 'event')}</span></div>
-          <div class="timeline">${d.events.length ? d.events.map(event => `<button class="event-row" data-action="open-item" data-id="${event.item_id}"><span class="badge ${event.action === 'in' ? 'in' : 'out'}">${escapeHtml(event.action)}</span>${iconHtml(event)}<span class="food-copy"><strong>${escapeHtml(event.object)}</strong><small>${fmtDate(event.time)} · ${escapeHtml(event.video)} @ ${event.time_s != null ? `${event.time_s.toFixed(1)} s` : '—'}</small></span><span class="item-qty">#${event.item_id}<small>${pct(event.confidence)}</small></span></button>`).join('') : emptyState('⌁', 'Quiet so far', 'No in/out events recorded.')}</div>
+          <div class="timeline">${d.events.length ? d.events.map(event => `<button class="event-row" data-action="open-item" data-id="${event.item_id}"><span class="badge ${event.action === 'in' ? 'in' : 'out'}">${escapeHtml(event.action)}</span><span class="food-icon">${event.emoji}</span><span class="food-copy"><strong>${escapeHtml(event.object)}</strong><small>${fmtDate(event.time)} · ${escapeHtml(event.video)} @ ${event.time_s != null ? `${event.time_s.toFixed(1)} s` : '—'}</small></span><span class="item-qty">#${event.item_id}<small>${pct(event.confidence)}</small></span></button>`).join('') : emptyState('⌁', 'Quiet so far', 'No in/out events recorded.')}</div>
         </article>
       </div>
       <div class="stack">
@@ -440,14 +351,14 @@ function renderActivity() {
             <div class="setting"><span>◷</span><span><strong>Inventory updated</strong><small>${fmtDate(d.updatedAt)}</small></span></div>
             <div class="setting"><span>♧</span><span><strong>Expiry checked</strong><small>${fmtDate(d.checkedAt)} · ${d.threshold} h threshold · hours shown are live</small></span></div>
             <div class="setting"><span>✦</span><span><strong>Recipes generated</strong><small>${fmtDate(d.generatedAt)}</small></span></div>
-            <div class="setting"><span>↻</span><span><strong>Auto-refresh</strong><small>Folder checked every ${POLL_MS / 1000} s${state.lastPoll ? ` · last ${fmtClock(state.lastPoll)}` : ''} · files last changed ${fmtClock(d.folderUpdatedAt)}</small></span></div>
+            <div class="setting"><span>↻</span><span><strong>Synced to site</strong><small>${fmtDate(state.index?.synced_at)}</small></span></div>
           </div>
         </article>
         <article class="panel panel-pad">
           <div class="section-top"><h2 class="section-title">Raw files</h2></div>
-          <div class="file-links">${['inventory.json', 'expire.json', 'recipes.json', 'events.json'].map(file => `<a class="file-link ${d.missing.includes(file) ? 'is-missing' : ''}" href="${fileUrl(file)}" target="_blank" rel="noopener">${file}<span>${d.missing.includes(file) ? 'missing' : 'open ↗'}</span></a>`).join('')}</div>
+          <div class="file-links">${['inventory.json', 'expire.json', 'recipes.json', 'events.json'].map(file => `<a class="file-link ${d.missing.includes(file) ? 'is-missing' : ''}" href="${dataPath(file)}" target="_blank" rel="noopener">${file}<span>${d.missing.includes(file) ? 'missing' : 'open ↗'}</span></a>`).join('')}</div>
         </article>
-        <article class="panel tip-card"><span class="tip-icon">⌁</span><h2>Add another video.</h2><p>Every run folds into this experiment: new items join, items seen leaving are taken off, expiry and recipes are recomputed. This page updates on its own.</p><code class="cmd">bash backend/pipeline.sh clip.mp4 ${escapeHtml(d.name)}</code></article>
+        <article class="panel tip-card"><span class="tip-icon">⌁</span><h2>Add another video.</h2><p>Every run folds into this experiment: new items join, items seen leaving are taken off, expiry and recipes are recomputed.</p><code class="cmd">backend/pipeline.sh clip.mp4 ${escapeHtml(d.name)}<br>cd frontend && npm run sync</code></article>
       </div>
     </section>`;
 }
@@ -462,9 +373,8 @@ function renderExperimentPicker() {
   const experiments = state.index?.experiments || [];
   select.innerHTML = experiments.length
     ? experiments.map(e => `<option value="${escapeHtml(e.name)}">${escapeHtml(e.name)}${e.name === state.index.latest ? ' · latest' : ''}</option>`).join('')
-    : '<option value="">No experiments yet</option>';
+    : '<option value="">No experiments synced</option>';
   select.disabled = !experiments.length;
-  if (state.experiment) select.value = state.experiment;
 }
 
 function render() {
@@ -479,7 +389,7 @@ function render() {
   if (state.experiment && select.value !== state.experiment) select.value = state.experiment;
   const card = document.querySelector('#experimentCard');
   card.querySelector('strong').textContent = state.experiment || 'No experiment';
-  card.querySelector('small').textContent = d ? `${plural(d.counts.total, 'item')} · ${plural(d.runs.length, 'scan')}` : (state.loading ? 'Loading…' : 'Run backend/pipeline.sh');
+  card.querySelector('small').textContent = d ? `${plural(d.counts.total, 'item')} · ${plural(d.runs.length, 'scan')}` : (state.loading ? 'Loading…' : 'Run npm run sync');
 }
 
 // ---------- modals ----------
@@ -494,20 +404,15 @@ function recipeModal(recipeId) {
   if (!recipe) return;
   const key = `${d.name}::${recipe.name}`;
   const checks = state.doneSteps[key] || [];
-  // ✓ = named exactly like a fridge item, ＋ = a pantry staple the chef declared, · = neither (not guessed).
-  const ingredientLine = ing => {
-    const cls = ing.source === 'fridge' ? 'from-fridge' : ing.source === 'pantry' ? 'from-pantry' : 'from-other';
-    const mark = ing.source === 'fridge' ? '✓' : ing.source === 'pantry' ? '＋' : '·';
-    const note = ing.source === 'fridge' ? ' · from the fridge' : ing.source === 'pantry' ? ' · pantry' : '';
-    return `<div class="ingredient-line ${cls} ${ing.urgent ? 'is-urgent' : ''}"><span class="ingredient-mark">${mark}</span><span class="ingredient-copy"><strong>${escapeHtml(ing.item)}</strong><small>${escapeHtml(ing.amount)}${note}</small></span></div>`;
-  };
+  const urgentNames = new Set((recipe.uses_expiring_items || []).map(n => n.toLowerCase()));
+  const ingredientLine = ing => `<div class="ingredient-line ${ing.fromFridge ? 'from-fridge' : 'from-pantry'} ${urgentNames.has(String(ing.item).toLowerCase()) ? 'is-urgent' : ''}"><span class="ingredient-mark">${ing.fromFridge ? '✓' : '＋'}</span><span class="ingredient-copy"><strong>${ing.emoji} ${escapeHtml(ing.item)}</strong><small>${escapeHtml(ing.amount)}${ing.fromFridge ? '' : ' · pantry'}</small></span></div>`;
   modalRoot.innerHTML = modalShell(`
     <div class="recipe-hero" style="background:linear-gradient(110deg,${recipe.color},#d89049 54%,#416a45)"><button class="modal-close" data-action="close-modal" aria-label="Close">×</button><p class="eyebrow">${recipe.matched}/${recipe.total} from your fridge${recipe.urgent ? ` · ${plural(recipe.urgent, 'expiring item')}` : ''}</p><h2 id="recipeTitle">${escapeHtml(recipe.name)}</h2><p>◷ ${recipe.prep_time_min} min prep + ${recipe.cook_time_min} min cook &nbsp;&nbsp; ◌ ${plural(recipe.servings, 'serving')}</p></div>
     <div class="recipe-details">
       <div><h3>Ingredients</h3>${recipe.ingredients.length ? recipe.ingredients.map(ingredientLine).join('') : '<p>No ingredient list.</p>'}</div>
-      <div><h3>Why it works</h3><p class="recipe-why">${escapeHtml(recipe.description)}</p><p class="recipe-why">Uses from the fridge: ${recipe.fridge.map(f => escapeHtml(f.name)).join(', ') || 'nothing listed'}.</p>${recipe.fridge.some(f => !f.item) ? `<p class="recipe-why is-muted">Not in the fridge any more: ${recipe.fridge.filter(f => !f.item).map(f => escapeHtml(f.name)).join(', ')}.</p>` : ''}</div>
+      <div><h3>Why it works</h3><p class="recipe-why">${escapeHtml(recipe.description)}</p>${recipe.fridge.some(f => !f.item) ? `<p class="recipe-why is-muted">Not in the fridge any more: ${recipe.fridge.filter(f => !f.item).map(f => escapeHtml(f.name)).join(', ')}.</p>` : ''}</div>
     </div>
-    <div class="steps"><h3>Steps</h3>${recipe.steps.map((step, index) => `<button class="step-check ${checks.includes(index) ? 'is-done' : ''}" data-action="toggle-step" data-recipe="${recipe.id}" data-step="${index}"><span>${checks.includes(index) ? '✓' : index + 1}</span>${escapeHtml(step)}</button>`).join('')}${checks.length ? `<div class="modal-actions"><button class="button outline" data-action="clear-steps" data-recipe="${recipe.id}">Clear progress</button></div>` : ''}</div>`, 'recipe-modal');
+    <div class="steps"><h3>Steps</h3>${recipe.steps.map((step, index) => `<button class="step-check ${checks.includes(index) ? 'is-done' : ''}" data-action="toggle-step" data-recipe="${recipe.id}" data-step="${index}"><span>${checks.includes(index) ? '✓' : index + 1}</span>${escapeHtml(step)}</button>`).join('')}<div class="modal-actions">${checks.length ? `<button class="button outline" data-action="clear-steps" data-recipe="${recipe.id}">Clear progress</button>` : ''}<button class="button" data-action="complete-recipe">Save for tonight</button></div></div>`, 'recipe-modal');
 }
 
 function itemModal(itemId) {
@@ -521,7 +426,7 @@ function itemModal(itemId) {
   const usedIn = d.recipes.filter(recipe => recipe.fridge.some(f => f.name.toLowerCase() === subject.object.toLowerCase()));
   const row = (label, value) => `<div class="detail-row"><span>${label}</span><strong>${value}</strong></div>`;
   modalRoot.innerHTML = modalShell(`
-    <header class="modal-head"><div><p class="eyebrow">Item #${subject.item_id}${gone ? ' · taken out' : ''}</p><h2>${escapeHtml(subject.object)}</h2></div><button class="modal-close" data-action="close-modal" aria-label="Close">×</button></header>
+    <header class="modal-head"><div><p class="eyebrow">Item #${subject.item_id}${gone ? ' · taken out' : ''}</p><h2>${emojiFor(subject.object)} ${escapeHtml(subject.object)}</h2></div><button class="modal-close" data-action="close-modal" aria-label="Close">×</button></header>
     <div class="modal-body">
       ${item ? `<div class="detail-status">${pill(item)}<span>${item.expiresAt ? `expires ${fmtDate(item.expiresAt)}` : 'add an alias in db/expire.json to track this'}</span></div>` : `<div class="detail-status"><span class="badge out">out</span><span>removed ${fmtDate(gone.removed_at)}</span></div>`}
       <div class="detail-grid">
@@ -539,10 +444,10 @@ function itemModal(itemId) {
 
 async function logModal(run) {
   modalRoot.innerHTML = modalShell(`<header class="modal-head"><div><p class="eyebrow">run.log</p><h2>${escapeHtml(run)}</h2></div><button class="modal-close" data-action="close-modal" aria-label="Close">×</button></header><div class="modal-body"><pre class="log-pre">Loading…</pre></div>`, 'log-modal');
-  const text = await fetchText(fileUrl(`runs/${run}/run.log`));
+  const text = await fetchText(dataPath(`runs/${encodeURIComponent(run)}/run.log`));
   const pre = modalRoot.querySelector('.log-pre');
   if (!pre) return; // closed while loading
-  pre.textContent = text ?? 'run.log not found for this run.';
+  pre.textContent = text ?? 'run.log not found for this run. Re-run npm run sync.';
 }
 
 function showAlerts() {
@@ -592,6 +497,7 @@ document.addEventListener('click', event => {
     saveSteps();
     recipeModal(recipe.id);
   }
+  if (action === 'complete-recipe') { closeModal(); showToast('Saved for tonight ✓'); }
 });
 
 document.addEventListener('change', event => {
