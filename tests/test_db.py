@@ -113,3 +113,24 @@ def test__set_profile__overwrites_rather_than_duplicating(store):
 
     # Assert
     assert store.get_profile()["diet_plan"] == "vegan"
+
+
+def test__inventory__carries_the_frame_it_was_seen_in(store):
+    # Arrange: a real door cycle records which frame the item was spotted in.
+    store.add_item(
+        detected("bell pepper"), shelf_life_days=12, frame_ref="20260912-141258-after.jpg"
+    )
+
+    # Act
+    item = store.find_present("bell pepper")
+
+    # Assert: the dashboard uses this to show the actual photo the camera took.
+    assert item.frame_ref == "20260912-141258-after.jpg"
+
+
+def test__manually_added_item__has_no_frame(store):
+    # Arrange: typed in by hand, so there is no photo behind it.
+    store.add_item(detected("milk"), shelf_life_days=7)
+
+    # Act / Assert: the UI must treat the photo as optional.
+    assert store.find_present("milk").frame_ref is None

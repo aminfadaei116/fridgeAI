@@ -443,4 +443,5 @@ def _row_to_item(row: sqlite3.Row) -> InventoryItem:
         est_cost=row["est_cost"],
         storage_tip=row["storage_tip"],
         removal_count=row["removal_count"],
+        frame_ref=row["frame_ref"],
     )

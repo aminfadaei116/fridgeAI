@@ -2,43 +2,42 @@
  *
  * One state fetch paints everything; a server-sent event stream repaints it when the door
  * opens. No framework, no build step - the interesting part of this project is behind the API.
+ *
+ * Visual spec: docs/DESIGN.md. The rule that shapes the rendering is that urgency carries on
+ * three channels - colour, shape and the day count in words - never colour alone.
  */
+
+import { foodIcon } from "/static/food-icons.js";
 
 const $ = (id) => document.getElementById(id);
 
-/* The expiry meter is scaled to one week, so bar length is comparable across foods. */
-const METER_WINDOW_DAYS = 7;
-
 const state = {
   inventory: [],
-  expiring: [],
   pending: [],
-  ledger: null,
-  messages: [],
+  ledger: {},
+  provider: { name: "openai", server_audio: true },
   camera: {},
   modelAvailable: false,
-  knownItemIds: new Set(),
+  seenItemIds: null,     // null until the first paint, so nothing animates on load
+  expanded: new Set(),
+  recipeOpen: new Set(),
+  recipes: [],
+  nutrition: null,
+  greeted: false,
   recording: false,
   recorder: null,
+  recognition: null,
+  agents: [],
+  doorOpen: false,
 };
 
-/* --- helpers --------------------------------------------------------------- */
+/* --- small helpers --------------------------------------------------------- */
 
 const money = (n) => `$${Number(n || 0).toFixed(2)}`;
-
-function urgencyOf(days) {
-  if (days === null || days === undefined) return { tier: "good", glyph: "●", label: "no date" };
-  if (days < 0) return { tier: "critical", glyph: "■", label: "Overdue" };
-  if (days === 0) return { tier: "critical", glyph: "■", label: "Today" };
-  if (days === 1) return { tier: "critical", glyph: "■", label: "Tomorrow" };
-  if (days <= 3) return { tier: "warning", glyph: "▲", label: `${days} days` };
-  return { tier: "good", glyph: "●", label: `${days} days` };
-}
-
-function clockOf(iso) {
-  const d = iso ? new Date(iso) : new Date();
-  return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-}
+const clock = (iso) =>
+  (iso ? new Date(iso) : new Date()).toLocaleTimeString([], {
+    hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false,
+  });
 
 function el(tag, className, text) {
   const node = document.createElement(tag);
@@ -47,10 +46,43 @@ function el(tag, className, text) {
   return node;
 }
 
+function shape(tier) {
+  return el("i", `shape shape-${tier}`);
+}
+
+/** The three urgency tiers. Colour is the last channel, never the only one. */
+function tierOf(days) {
+  if (days === null || days === undefined) return { tier: "fine", words: "no date" };
+  if (days < 0) return { tier: "critical", words: "Overdue" };
+  if (days === 0) return { tier: "critical", words: "Today" };
+  if (days === 1) return { tier: "critical", words: "Tomorrow" };
+  if (days <= 3) return { tier: "warning", words: `${days} days` };
+  return { tier: "fine", words: `${days} days` };
+}
+
+/* Units that are counted, so they take a plural. Measures (g, ml, L) never do. */
+const COUNTABLE_UNITS = new Set([
+  "piece", "unit", "bag", "tub", "block", "container", "bunch", "fillet",
+  "can", "jar", "box", "pack", "bottle", "loaf", "head", "clove", "slice",
+]);
+
+function quantityLabel(quantity, unit) {
+  const amount = Number(quantity);
+  const plural = amount !== 1 && COUNTABLE_UNITS.has(unit) ? `${unit}s` : unit;
+  return `${amount % 1 === 0 ? amount : amount.toFixed(1)} ${plural}`;
+}
+
+/** Copy derived from how often an item has been picked up and put back. */
+function handledNote(count) {
+  if (count >= 2) return `picked up ${count}× and still here`;
+  if (count === 1) return "picked up once";
+  return "not touched since intake";
+}
+
 function toast(message, tone = "info") {
   const node = el("div", "toast", message);
   node.dataset.tone = tone;
-  $("toast-stack").append(node);
+  $("toasts").append(node);
   setTimeout(() => {
     node.style.opacity = "0";
     node.style.transition = "opacity .3s";
@@ -67,56 +99,443 @@ async function api(path, options = {}) {
   return response;
 }
 
-async function apiJson(path, options) {
-  return (await api(path, options)).json();
-}
+const apiJson = async (path, options) => (await api(path, options)).json();
 
-function postJson(path, body) {
-  return apiJson(path, {
+const postJson = (path, body) =>
+  apiJson(path, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
-}
 
-/* --- rendering ------------------------------------------------------------- */
+/* --- top-level paint ------------------------------------------------------- */
 
 function renderAll(data) {
   state.inventory = data.inventory || [];
-  state.expiring = data.expiring || [];
   state.pending = data.pending || [];
   state.ledger = data.ledger || {};
   state.camera = data.camera || {};
   state.modelAvailable = !!data.model_available;
-  state.provider = data.provider || { name: "openai", server_audio: true };
+  state.provider = data.provider || state.provider;
 
-  renderStatus();
+  renderHeader(data);
+  renderStats();
+  renderConfirm();
+  renderItems();
+  renderRecipes();
   renderLedger();
-  renderExpiring();
-  renderInventory();
-  renderPending();
-  renderFeed(data.events || []);
+  renderActivity(data.events || []);
 
   if (!state.greeted) {
     state.greeted = true;
     const history = data.messages || [];
-    if (history.length) {
-      history.forEach((m) => addBubble(m.role, m.content, [], false));
-    } else {
-      addBubble("assistant", openingLine(), [], false);
-    }
+    if (history.length) history.forEach((m) => addBubble(m.role, m.content, [], false));
+    else addBubble("assistant", openingLine(), [], false);
   }
 }
 
+function renderHeader(data) {
+  const lastScan = (data.events || []).find((e) =>
+    ["vision_diff", "added", "removed"].includes(e.kind)
+  );
+  $("head-scan").textContent = state.doorOpen
+    ? "scanning now"
+    : lastScan
+      ? `last scan ${clock(lastScan.ts)} · ${state.inventory.length} items tracked`
+      : `no scans yet · ${state.inventory.length} items tracked`;
+
+  const profile = data.profile || {};
+  const bits = [];
+  if (profile.household_size) bits.push(`${profile.household_size} adults`);
+  if (profile.diet_plan) bits.push(profile.diet_plan);
+  (profile.allergies || []).forEach((a) => bits.push(`no ${a}`));
+  if (profile.daily_calorie_target) bits.push(`${profile.daily_calorie_target} kcal target`);
+  $("head-profile").textContent = bits.join(" · ");
+
+  $("btn-camera").textContent = state.camera.running ? "Stop camera" : "Start camera";
+}
+
+function renderStats() {
+  const spoilToday = state.inventory.filter((i) => (i.days_left ?? 99) <= 0).length;
+  const hasItems = state.inventory.length > 0;
+
+  $("stat-today").textContent = hasItems ? String(spoilToday) : "0";
+  $("stat-today-cap").textContent = hasItems
+    ? `${spoilToday === 1 ? "item spoils" : "items spoil"} today`
+    : "items tracked";
+
+  const l = state.ledger;
+  $("stat-saved").textContent = money(l.saved_cad);
+  $("stat-saved-cap").textContent =
+    `saved in 7 days · ${l.items_saved || 0} items eaten in time`;
+  $("stat-wasted").textContent = money(l.wasted_cad);
+  $("stat-wasted-cap").textContent =
+    `wasted in 7 days · ${l.items_wasted || 0} items binned`;
+}
+
+/* --- items ----------------------------------------------------------------- */
+
+function renderItems() {
+  const host = $("items");
+  host.replaceChildren();
+
+  if (!state.inventory.length) {
+    $("items-count").textContent = "";
+    host.append(emptyState());
+    state.seenItemIds = new Set();
+    return;
+  }
+
+  $("items-count").textContent = state.doorOpen
+    ? `${state.inventory.length} items · just added at the top`
+    : `${state.inventory.length} items · sorted by days left`;
+
+  // First paint must not animate; after that, anything new arrives.
+  const firstPaint = state.seenItemIds === null;
+  const seen = state.seenItemIds || new Set();
+
+  for (const item of state.inventory) {
+    host.append(itemCard(item, !firstPaint && !seen.has(item.id)));
+  }
+  state.seenItemIds = new Set(state.inventory.map((i) => i.id));
+}
+
+function itemCard(item, isNew) {
+  const { tier, words } = tierOf(item.days_left);
+  const card = el("article", "item");
+  card.dataset.tier = tier;
+  if (isNew) card.classList.add("is-arriving");
+
+  // Icon tile, with the real intake photo overlapping its corner when one exists.
+  const icon = el("div", "item-icon");
+  icon.append(document.createTextNode(foodIcon(item.name, item.category)));
+  const photo = el("span", "item-photo");
+  if (item.frame_ref) {
+    photo.dataset.hasPhoto = "true";
+    photo.style.backgroundImage = `url("/api/frames/${encodeURIComponent(item.frame_ref)}")`;
+    photo.title = "Frame captured when this went in";
+  }
+  icon.append(photo);
+  card.append(icon);
+
+  const main = el("div", "item-main");
+  main.append(el("div", "item-name", item.name));
+  main.append(el("div", "item-cat mono", item.category));
+  main.append(
+    el(
+      "div",
+      "item-meta",
+      `${quantityLabel(item.quantity, item.unit)} · ${money(item.est_cost)} · ${handledNote(item.removal_count)}`
+    )
+  );
+  card.append(main);
+
+  const right = el("div", "item-right");
+  right.append(shape(tier));
+  right.append(el("span", "item-days", words));
+
+  const expanded = state.expanded.has(item.id);
+  const toggle = el("button", "expand", expanded ? "−" : "+");
+  toggle.setAttribute("aria-expanded", String(expanded));
+  toggle.setAttribute("aria-label", `Details for ${item.name}`);
+  toggle.addEventListener("click", () => {
+    if (state.expanded.has(item.id)) state.expanded.delete(item.id);
+    else state.expanded.add(item.id);
+    renderItems();
+  });
+  right.append(toggle);
+  card.append(right);
+
+  if (expanded) card.append(itemDetail(item));
+  return card;
+}
+
+function itemDetail(item) {
+  const detail = el("div", "item-detail");
+
+  const photo = el("div", "detail-photo");
+  if (item.frame_ref) {
+    photo.style.backgroundImage = `url("/api/frames/${encodeURIComponent(item.frame_ref)}")`;
+  } else {
+    photo.textContent = "intake photo";
+  }
+  detail.append(photo);
+
+  const text = el("div", "detail-text");
+  text.append(el("p", "detail-label", "shelf life · storage tip"));
+  text.append(el("p", "detail-tip", item.storage_tip || "No storage note for this one."));
+  const expires = item.expires_at ? new Date(item.expires_at).toLocaleDateString() : "unknown";
+  text.append(
+    el("p", "detail-dates", `expires ${expires} · shelf life ${item.shelf_life_days ?? "?"} days`)
+  );
+  detail.append(text);
+  return detail;
+}
+
+function emptyState() {
+  const box = el("div", "empty");
+  const tile = el("div", "empty-tile", "🧺");
+  box.append(tile);
+  box.append(el("h3", null, "Nothing tracked yet"));
+  box.append(
+    el(
+      "p",
+      null,
+      "Open the door and put something in. The camera wakes on the door switch, compares " +
+        "the before and after frame, and logs what changed."
+    )
+  );
+  const l = state.ledger;
+  box.append(
+    el("p", "empty-nums mono",
+      `${money(l.saved_cad)} saved · ${money(l.wasted_cad)} wasted · 0 items`)
+  );
+  return box;
+}
+
+/* --- the confirmation card ------------------------------------------------- */
+
+function renderConfirm() {
+  const zone = $("confirm-zone");
+  zone.replaceChildren();
+
+  for (const pending of state.pending) {
+    const card = el("section", "confirm");
+
+    const tile = el("div", "confirm-tile", foodIcon(pending.item.name, pending.item.category));
+    card.append(tile);
+
+    const body = el("div", "confirm-body");
+    body.append(el("p", "confirm-who", "vision · curator"));
+    body.append(el("p", "confirm-q", pending.question));
+
+    const bar = el("div", "confirm-bar");
+    const fill = el("i");
+    fill.style.width = `${Math.round(pending.item.confidence * 100)}%`;
+    bar.append(fill);
+    body.append(bar);
+
+    body.append(
+      el(
+        "p",
+        "confirm-meta",
+        `${Math.round(pending.item.confidence * 100)}% confidence · ` +
+          `frame captured ${clock(pending.created_at)} · ` +
+          `${pending.item.category}, ${pending.item.quantity} ${pending.item.unit}`
+      )
+    );
+
+    const actions = el("div", "confirm-actions");
+    const yes = el("button", "btn-yes", "Yes, that's right");
+    yes.addEventListener("click", () => resolvePending(pending.id, true));
+    const no = el("button", "btn-no", "No");
+    no.addEventListener("click", () => resolvePending(pending.id, false));
+    actions.append(yes, no);
+    body.append(actions);
+
+    card.append(body);
+    zone.append(card);
+  }
+}
+
+async function resolvePending(id, confirmed) {
+  await postJson(`/api/pending/${id}`, { confirmed });
+  toast(confirmed ? "Confirmed — written to the inventory" : "Discarded that detection",
+        confirmed ? "good" : "info");
+  refresh();
+}
+
+/* --- recipes --------------------------------------------------------------- */
+
+function renderRecipes() {
+  const host = $("recipes");
+  host.replaceChildren();
+  const has = state.recipes.length > 0;
+  $("recipes-head").hidden = !has;
+  if (!has) return;
+
+  const macros = new Map((state.nutrition?.estimates || []).map((e) => [e.recipe_title, e]));
+  $("recipes-count").textContent = state.nutrition?.day_total_calories
+    ? `${state.recipes.length} options · ~${state.nutrition.day_total_calories} kcal/day`
+    : `${state.recipes.length} options`;
+
+  state.recipes.forEach((recipe, index) => {
+    host.append(recipeCard(recipe, index, macros.get(recipe.title)));
+  });
+}
+
+function recipeCard(recipe, index, macro) {
+  const open = state.recipeOpen.has(index);
+  const card = el("article", "recipe");
+
+  const top = el("div", "recipe-top");
+  const head = el("div", "recipe-head");
+  head.append(el("div", "recipe-title", recipe.title));
+  const meta = [
+    recipe.meal,
+    `${recipe.minutes} min`,
+    `${recipe.servings} servings`,
+    macro ? `${macro.calories_per_serving} kcal a serving` : null,
+  ].filter(Boolean);
+  head.append(el("div", "recipe-meta", meta.join(" · ")));
+  top.append(head);
+
+  const toggle = el("button", "recipe-toggle", open ? "Collapse" : "Steps & nutrition");
+  toggle.setAttribute("aria-expanded", String(open));
+  toggle.addEventListener("click", () => {
+    if (state.recipeOpen.has(index)) state.recipeOpen.delete(index);
+    else state.recipeOpen.add(index);
+    renderRecipes();
+  });
+  top.append(toggle);
+  card.append(top);
+
+  if (recipe.why_this) card.append(el("p", "recipe-why", recipe.why_this));
+
+  const chips = el("div", "chips");
+  for (const ing of recipe.ingredients || []) {
+    if (!ing.from_fridge) continue;
+    const chip = el("span", ing.expiring ? "chip chip-expiring" : "chip");
+    if (ing.expiring) chip.append(shape("critical"));
+    chip.append(document.createTextNode(ing.name));
+    chips.append(chip);
+  }
+  for (const missing of recipe.missing || []) {
+    chips.append(el("span", "chip chip-missing", missing));
+  }
+  if (chips.childElementCount) card.append(chips);
+
+  if (open) card.append(recipeDetail(recipe, macro));
+  return card;
+}
+
+function recipeDetail(recipe, macro) {
+  const detail = el("div", "recipe-detail");
+
+  const left = el("div");
+  left.append(el("p", "detail-label", "steps"));
+  const steps = el("ol", "steps");
+  (recipe.steps || []).forEach((step, i) => {
+    const li = el("li");
+    li.append(el("span", null, String(i + 1).padStart(2, "0")));
+    li.append(el("p", null, step));
+    steps.append(li);
+  });
+  left.append(steps);
+  detail.append(left);
+
+  const right = el("div");
+  right.append(el("p", "detail-label", "nutrition · per serving"));
+  if (macro) {
+    const grid = el("div", "macros");
+    for (const [value, label] of [
+      [macro.calories_per_serving, "calories"],
+      [`${macro.protein_g}g`, "protein"],
+      [`${macro.carbs_g}g`, "carbs"],
+      [`${macro.fat_g}g`, "fat"],
+    ]) {
+      const tile = el("div", "macro");
+      tile.append(el("b", null, String(value)));
+      tile.append(el("span", null, label));
+      grid.append(tile);
+    }
+    right.append(grid);
+
+    if (!macro.fits_target && macro.adjustment) {
+      const note = el("div", "adjust");
+      note.append(shape("warning"));
+      note.append(el("span", null, macro.adjustment));
+      right.append(note);
+    }
+  } else {
+    right.append(el("p", "side-empty", "No estimate for this one."));
+  }
+
+  if ((recipe.missing || []).length) {
+    right.append(el("p", "recipe-missing", `Missing: ${recipe.missing.join(", ")}.`));
+  }
+  detail.append(right);
+  return detail;
+}
+
+/* --- side blocks ----------------------------------------------------------- */
+
+function renderLedger() {
+  const host = $("ledger");
+  host.replaceChildren();
+  const entries = state.ledger.entries || [];
+  if (!entries.length) {
+    host.append(el("p", "side-empty", "Nothing logged this week."));
+    return;
+  }
+  for (const entry of entries) {
+    const row = el("div", "ledger-row");
+    row.append(el("span", "ledger-name", entry.item_name));
+    const amount = el(
+      "span",
+      `ledger-amt ${entry.kind}`,
+      `${entry.kind === "saved" ? "+" : "−"}${money(entry.est_cost)}`
+    );
+    row.append(amount);
+    row.append(el("span", "ledger-reason", entry.reason || entry.kind));
+    host.append(row);
+  }
+}
+
+const EVENT_COPY = {
+  added: (e) => `${e.item_name} went in`,
+  removed: (e) => `${e.item_name} came out`,
+  rejected: (e) => `ignored ${e.item_name} — ${e.payload?.reason || "low confidence"}`,
+  correction: (e) => `you corrected ${e.item_name}`,
+  vision_diff: (e) => {
+    const n = (e.payload?.added?.length || 0) + (e.payload?.removed?.length || 0);
+    return n ? `vision saw ${n} change${n > 1 ? "s" : ""}` : "vision saw no change";
+  },
+  demo_seeded: () => "demo fridge loaded",
+  note: (e) => e.payload?.reason || "note",
+};
+
+function renderActivity(events) {
+  const host = $("activity");
+  host.replaceChildren();
+  if (!events.length) {
+    host.append(el("p", "side-empty", "Nothing yet."));
+    return;
+  }
+  for (const event of events.slice(0, 10)) {
+    const row = el("div", "activity-row");
+    row.append(el("time", null, clock(event.ts)));
+    const describe = EVENT_COPY[event.kind] || ((e) => e.kind);
+    row.append(el("p", null, describe(event)));
+    host.append(row);
+  }
+}
+
+function renderRoster(agents) {
+  state.agents = agents;
+  const host = $("roster");
+  host.replaceChildren();
+  for (const agent of agents) {
+    const row = el("div", "agent-row");
+    row.append(el("span", "agent-name", agent.name.replace("_", " ")));
+    row.append(el("span", "agent-role", agent.role));
+    host.append(row);
+  }
+}
+
+/* --- chat ------------------------------------------------------------------ */
+
 function openingLine() {
   if (!state.inventory.length) {
-    return "The fridge is empty as far as I know. Open the door with the camera running, or load the demo fridge.";
+    return "Nothing in here that I know of. Open the door with the camera running, or load the demo fridge.";
   }
-  const urgent = state.expiring.filter((i) => (i.days_left ?? 99) <= 1).map((i) => i.name);
+  const urgent = state.inventory
+    .filter((i) => (i.days_left ?? 99) <= 1)
+    .map((i) => i.name);
   const head = urgent.length
-    ? `${listOf(urgent)} ${urgent.length === 1 ? "goes" : "go"} tomorrow.`
-    : `Nothing goes off in the next day.`;
-  return `${state.inventory.length} things in here, ${state.expiring.length} of them within three days. ${head}\n\nAsk me what to cook, or just tell me about tonight — how many people, what you do and don't eat.`;
+    ? `${listOf(urgent)} ${urgent.length === 1 ? "goes" : "go"} tomorrow or sooner.`
+    : "Nothing goes off in the next day.";
+  return `${state.inventory.length} things in here. ${head}\n\nAsk me what to cook, or tell me about tonight.`;
 }
 
 function listOf(names) {
@@ -124,241 +543,15 @@ function listOf(names) {
   return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
 }
 
-function renderStatus() {
-  const camera = state.camera;
-  const cameraPill = $("camera-pill");
-  cameraPill.dataset.ok = String(!!camera.running);
-  $("camera-text").textContent = camera.running
-    ? `Camera live · ${camera.brightness}`
-    : camera.error ? "Camera unavailable" : "Camera off";
-  $("btn-camera").textContent = camera.running ? "Stop camera" : "Start camera";
-
-  const modelPill = $("model-pill");
-  modelPill.dataset.ok = String(state.modelAvailable);
-  const provider = state.provider || {};
-  $("model-text").textContent = state.modelAvailable
-    ? `${provider.model || "model"} connected`
-    : `No ${provider.name === "gemini" ? "Gemini" : "OpenAI"} key`;
-
-  if (!camera.running) setDoor("closed", "Camera idle", "—");
-}
-
-function setDoor(stateName, text, meta) {
-  const pill = $("door-pill");
-  pill.dataset.state = stateName;
-  $("door-text").textContent = text;
-  if (meta !== undefined) $("door-meta").textContent = meta;
-}
-
-function renderLedger() {
-  const l = state.ledger || {};
-  const saved = Number(l.saved_cad || 0);
-  const wasted = Number(l.wasted_cad || 0);
-  const total = saved + wasted;
-
-  $("kpi-saved").textContent = money(saved);
-  $("kpi-saved-note").textContent = `${l.items_saved || 0} items used before their date`;
-  $("kpi-wasted").textContent = money(wasted);
-  $("kpi-wasted-note").textContent = `${l.items_wasted || 0} items past saving`;
-  $("kpi-count").textContent = String(state.inventory.length);
-  $("kpi-count-note").textContent = `${state.expiring.length} need attention`;
-
-  const savedPct = total ? (saved / total) * 100 : 50;
-  $("split-saved").style.width = `${savedPct}%`;
-  $("split-wasted").style.width = `${100 - savedPct}%`;
-  $("split-saved-pct").textContent = total ? `${Math.round(savedPct)}%` : "—";
-  $("split-wasted-pct").textContent = total ? `${Math.round(100 - savedPct)}%` : "—";
-}
-
-function renderExpiring() {
-  const host = $("expiring-list");
-  host.replaceChildren();
-  $("expiring-count").textContent = state.expiring.length
-    ? `${state.expiring.length} within 3 days`
-    : "all clear";
-
-  if (!state.expiring.length) {
-    host.append(el("p", "empty", "Nothing is close to its date. Rare, and worth noticing."));
-    return;
-  }
-
-  for (const item of state.expiring) {
-    const urgency = urgencyOf(item.days_left);
-    const row = el("div", "expiry-row");
-    if (!state.knownItemIds.has(item.id)) row.classList.add("is-new");
-
-    row.append(el("i", `glyph g-${urgency.tier}`, urgency.glyph));
-
-    const main = el("div", "expiry-main");
-    main.append(el("div", "expiry-name", item.name));
-    const handled = item.removal_count
-      ? ` · picked up ${item.removal_count}×`
-      : "";
-    main.append(
-      el("div", "expiry-meta", `${item.quantity} ${item.unit} · ${money(item.est_cost)}${handled}`)
-    );
-
-    // Days remaining against a fixed one-week window, NOT a fraction of shelf life:
-    // two items both due tomorrow must show the same bar, whatever their shelf life.
-    const meter = el("div", "meter");
-    const fill = el("i");
-    const left = Math.max(0, Math.min(1, (item.days_left ?? 0) / METER_WINDOW_DAYS));
-    fill.style.width = `${Math.max(4, left * 100)}%`;
-    fill.style.background = `var(--${urgency.tier})`;
-    meter.setAttribute("role", "img");
-    meter.setAttribute("aria-label", `${item.days_left} of ${METER_WINDOW_DAYS} days remaining`);
-    meter.append(fill);
-    main.append(meter);
-    row.append(main);
-
-    row.append(el("span", `days-chip chip-${urgency.tier}`, urgency.label));
-    host.append(row);
-  }
-}
-
-function renderInventory() {
-  const host = $("inventory-list");
-  host.replaceChildren();
-  $("inventory-count").textContent = `${state.inventory.length} items`;
-
-  if (!state.inventory.length) {
-    host.append(el("p", "empty", "The fridge is empty. Reset the demo, or open the door."));
-    return;
-  }
-
-  for (const item of state.inventory) {
-    const urgency = urgencyOf(item.days_left);
-    const row = el("div", "inv-row");
-    row.append(el("i", `glyph g-${urgency.tier}`, urgency.glyph));
-    row.append(el("span", "inv-name", item.name));
-    row.append(el("span", "inv-qty", `${item.quantity} ${item.unit}`));
-    row.append(el("span", "inv-days", urgency.label));
-
-    const discard = el("button", "icon-btn", "✕");
-    discard.title = `Throw out the ${item.name} (counts as waste)`;
-    discard.setAttribute("aria-label", `Throw out the ${item.name}`);
-    discard.addEventListener("click", async () => {
-      await api(`/api/items/${item.id}/discard`, { method: "POST" });
-      toast(`${item.name} logged as thrown out`, "bad");
-      refresh();
-    });
-    row.append(discard);
-    host.append(row);
-  }
-
-  state.knownItemIds = new Set(state.inventory.map((i) => i.id));
-}
-
-function renderPending() {
-  const zone = $("confirm-zone");
-  zone.replaceChildren();
-  zone.hidden = !state.pending.length;
-
-  for (const pending of state.pending) {
-    const card = el("div", "confirm-card");
-    card.append(el("div", "confirm-icon", "?"));
-
-    const text = el("div", "confirm-text");
-    text.append(el("strong", null, pending.question));
-    text.append(
-      el(
-        "span",
-        null,
-        `The vision agent was ${Math.round(pending.item.confidence * 100)}% confident, ` +
-          `below the ${80}% bar to write it in on its own.`
-      )
-    );
-    card.append(text);
-
-    const actions = el("div", "confirm-actions");
-    const yes = el("button", "btn", "Yes, that's right");
-    yes.addEventListener("click", () => resolvePending(pending.id, true));
-    const no = el("button", "btn btn-ghost", "No");
-    no.addEventListener("click", () => resolvePending(pending.id, false));
-    actions.append(yes, no);
-    card.append(actions);
-
-    zone.append(card);
-  }
-}
-
-async function resolvePending(id, confirmed) {
-  await postJson(`/api/pending/${id}`, { confirmed });
-  toast(confirmed ? "Confirmed - written to the inventory" : "Discarded that detection", confirmed ? "good" : "info");
-  refresh();
-}
-
-function renderFeed(events) {
-  const host = $("feed");
-  host.replaceChildren();
-  if (!events.length) {
-    host.append(el("li", "empty", "Nothing yet."));
-    return;
-  }
-
-  const labels = {
-    added: ["ev-added", (e) => `${e.item_name} went in`],
-    removed: ["ev-removed", (e) => `${e.item_name} came out`],
-    rejected: ["ev-rejected", (e) => `ignored ${e.item_name} — ${e.payload?.reason || "low confidence"}`],
-    correction: ["ev-warn", (e) => `you corrected ${e.item_name}`],
-    vision_diff: ["ev-rejected", (e) => {
-      const d = e.payload || {};
-      const n = (d.added?.length || 0) + (d.removed?.length || 0);
-      return n ? `vision saw ${n} change${n > 1 ? "s" : ""}` : "vision saw no change";
-    }],
-    demo_seeded: ["ev-warn", () => "demo fridge loaded"],
-    note: ["ev-rejected", (e) => e.payload?.reason || "note"],
-  };
-
-  for (const event of events.slice(0, 22)) {
-    const [cls, describe] = labels[event.kind] || ["ev-rejected", (e) => e.kind];
-    const li = el("li");
-    li.append(el("time", null, clockOf(event.ts)));
-    li.append(el("span", cls, describe(event)));
-    host.append(li);
-  }
-}
-
-function renderRoster(agents, active = []) {
-  const host = $("roster");
-  host.replaceChildren();
-  for (const agent of agents) {
-    const li = el("li");
-    li.dataset.active = String(active.includes(agent.name));
-    const name = el("div", "roster-name");
-    name.append(el("i"));
-    name.append(document.createTextNode(agent.name.replace("_", " ")));
-    li.append(name);
-    li.append(el("div", "roster-role", agent.role));
-    host.append(li);
-  }
-  state.agents = agents;
-}
-
-function flashRoster(called) {
-  if (!state.agents) return;
-  const mapped = called.map((tool) => {
-    if (tool === "plan_meals") return "chef";
-    if (tool === "check_expiring") return "sentinel";
-    if (tool === "save_profile") return "concierge";
-    return "concierge";
-  });
-  if (called.includes("plan_meals")) mapped.push("nutrition");
-  renderRoster(state.agents, ["concierge", ...mapped]);
-  setTimeout(() => renderRoster(state.agents, []), 4000);
-}
-
-/* --- chat ------------------------------------------------------------------ */
-
-function addBubble(role, content, called = [], animate = true) {
+function addBubble(role, content, ran = [], animate = true) {
   const log = $("chat-log");
   const bubble = el("div", `bubble bubble-${role === "user" ? "user" : "agent"}`);
   bubble.textContent = content;
   if (!animate) bubble.style.animation = "none";
 
-  if (called.length) {
-    const strip = el("div", "called");
-    [...new Set(called)].forEach((name) => strip.append(el("span", null, name.replace("_", " "))));
+  if (ran.length) {
+    const strip = el("div", "ran");
+    [...new Set(ran)].forEach((name) => strip.append(el("span", null, name.replace("_", " "))));
     bubble.append(strip);
   }
   log.append(bubble);
@@ -366,105 +559,46 @@ function addBubble(role, content, called = [], animate = true) {
   return bubble;
 }
 
-function thinkingBubble(text = "thinking…") {
+function thinking(text = "thinking…") {
   const bubble = addBubble("assistant", text);
-  bubble.classList.add("is-thinking");
+  bubble.classList.add("thinking");
   return bubble;
 }
 
 async function send(text) {
   if (!text.trim()) return;
   addBubble("user", text);
-  $("chat-input").value = "";
-  const thinking = thinkingBubble();
-
+  $("chat-text").value = "";
+  const pending = thinking();
   try {
     const reply = await postJson("/api/chat", { text });
-    thinking.remove();
+    pending.remove();
     addBubble("assistant", reply.reply, reply.agents_called || []);
     afterReply(reply);
   } catch (error) {
-    thinking.remove();
+    pending.remove();
     addBubble("assistant", `Something broke: ${error.message}`);
   }
 }
 
 function afterReply(reply) {
-  flashRoster(reply.agents_called || []);
-  if (reply.recipes?.length) renderRecipes(reply.recipes, reply.nutrition);
-  if (reply.profile_updated) toast("Saved that to your profile", "good");
-  if (reply.reply && $("tts-toggle").checked && state.modelAvailable) speak(reply.reply);
-  refresh();
-}
-
-function renderRecipes(recipes, nutrition) {
-  const card = $("recipe-card");
-  const host = $("recipe-list");
-  host.replaceChildren();
-  card.hidden = false;
-
-  const macros = new Map(
-    (nutrition?.estimates || []).map((e) => [e.recipe_title, e])
-  );
-  $("recipe-sub").textContent = nutrition?.day_total_calories
-    ? `${recipes.length} options · ~${nutrition.day_total_calories} kcal/day`
-    : `${recipes.length} options`;
-
-  for (const recipe of recipes) {
-    const details = el("details", "recipe");
-    const summary = document.createElement("summary");
-
-    const top = el("div", "recipe-top");
-    top.append(el("span", "recipe-title", recipe.title));
-    top.append(el("span", "recipe-meal", `${recipe.meal} · ${recipe.minutes} min`));
-    summary.append(top);
-
-    if (recipe.why_this) summary.append(el("div", "recipe-why", recipe.why_this));
-
-    const tags = el("div", "recipe-tags");
-    (recipe.uses_expiring || []).forEach((n) => tags.append(el("span", "tag tag-urgent", `uses ${n}`)));
-    const macro = macros.get(recipe.title);
-    if (macro) {
-      tags.append(
-        el("span", "tag tag-macro",
-          `${macro.calories_per_serving} kcal · ${macro.protein_g}g protein`)
-      );
-    }
-    (recipe.missing || []).forEach((n) => tags.append(el("span", "tag tag-missing", `need ${n}`)));
-    if (tags.childElementCount) summary.append(tags);
-    details.append(summary);
-
-    const body = el("div", "recipe-body");
-    body.append(el("h4", null, "Ingredients"));
-    const ul = document.createElement("ul");
-    for (const ing of recipe.ingredients || []) {
-      const li = el("li", ing.from_fridge ? "have" : null, `${ing.amount} ${ing.name}`);
-      ul.append(li);
-    }
-    body.append(ul);
-
-    body.append(el("h4", null, "Method"));
-    const ol = document.createElement("ol");
-    (recipe.steps || []).forEach((step) => ol.append(el("li", null, step)));
-    body.append(ol);
-
-    if (macro?.adjustment) {
-      body.append(el("h4", null, "To hit your target"));
-      body.append(el("p", "recipe-why", macro.adjustment));
-    }
-
-    details.append(body);
-    host.append(details);
+  if (reply.recipes?.length) {
+    state.recipes = reply.recipes;
+    state.nutrition = reply.nutrition;
+    state.recipeOpen = new Set([0]);   // land the demo on a filled card
+    renderRecipes();
   }
+  if (reply.profile_updated) toast("Saved that to your profile", "good");
+  if (reply.reply && state.modelAvailable) speak(reply.reply);
+  refresh();
 }
 
 /* --- voice ----------------------------------------------------------------- */
 
 async function speak(text) {
   // Gemini's OpenAI-compatible surface has no /audio/speech, so fall back to the browser's
-  // own synthesiser. It costs nothing, needs no network, and keeps the demo intact.
+  // own synthesiser. Costs nothing, needs no network, keeps the demo intact.
   if (!state.provider?.server_audio) return speakInBrowser(text);
-
   try {
     const response = await api("/api/speak", {
       method: "POST",
@@ -472,9 +606,9 @@ async function speak(text) {
       body: JSON.stringify({ text }),
     });
     const audio = new Audio(URL.createObjectURL(await response.blob()));
-    audio.play().catch(() => {});   /* autoplay blocked until the user interacts - fine */
+    audio.play().catch(() => {});
   } catch {
-    speakInBrowser(text);           /* speech is a nicety; never let it break the turn */
+    speakInBrowser(text);
   }
 }
 
@@ -486,30 +620,20 @@ function speakInBrowser(text) {
     utterance.rate = 1.05;
     window.speechSynthesis.speak(utterance);
   } catch {
-    /* no synthesiser available - silent is fine */
+    /* no synthesiser - silence is fine */
   }
-}
-
-/* Browser dictation, used when the provider has no transcription endpoint. Chrome and Edge
- * expose this; Firefox does not, which is why the caller checks before using it. */
-function browserDictation() {
-  const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!Recognition) return null;
-  const recognition = new Recognition();
-  recognition.lang = navigator.language || "en-US";
-  recognition.interimResults = false;
-  recognition.maxAlternatives = 1;
-  return recognition;
 }
 
 function listenInBrowser() {
-  const recognition = browserDictation();
-  const button = $("btn-mic");
-  const hint = $("composer-hint");
-  if (!recognition) {
-    hint.textContent = "This browser has no speech recognition. Chrome or Edge does, or just type.";
+  const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const hint = $("chat-hint");
+  if (!Recognition) {
+    hint.textContent = "No speech recognition in this browser. Chrome or Edge has it.";
     return;
   }
+  const recognition = new Recognition();
+  recognition.lang = navigator.language || "en-US";
+  recognition.interimResults = false;
 
   recognition.addEventListener("result", (event) => {
     const transcript = event.results[0][0].transcript;
@@ -518,82 +642,86 @@ function listenInBrowser() {
   recognition.addEventListener("error", (event) => {
     hint.textContent =
       event.error === "not-allowed"
-        ? "Microphone permission was refused."
-        : `Speech recognition failed: ${event.error}`;
+        ? "Microphone permission refused."
+        : `Speech failed: ${event.error}`;
   });
   recognition.addEventListener("end", () => {
     state.recording = false;
     state.recognition = null;
-    button.dataset.recording = "false";
-    if (hint.textContent === "Listening - speak now.") hint.textContent = "";
+    $("btn-mic").dataset.recording = "false";
+    if (hint.textContent.startsWith("Listening")) hint.textContent = "";
   });
 
   recognition.start();
   state.recognition = recognition;
   state.recording = true;
-  button.dataset.recording = "true";
-  hint.textContent = "Listening - speak now.";
+  $("btn-mic").dataset.recording = "true";
+  hint.textContent = "Listening — speak now.";
 }
 
 async function toggleRecording() {
   const button = $("btn-mic");
-  const hint = $("composer-hint");
+  const hint = $("chat-hint");
 
   if (state.recording) {
     state.recorder?.stop();
     state.recognition?.stop();
     return;
   }
+  if (!state.provider?.server_audio) return listenInBrowser();
 
-  // No server-side transcription on this provider - dictate in the browser instead.
-  if (!state.provider?.server_audio) {
-    listenInBrowser();
-    return;
-  }
   if (!navigator.mediaDevices?.getUserMedia) {
     hint.textContent = "This browser will not give us a microphone.";
     return;
   }
-
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     const recorder = new MediaRecorder(stream);
     const chunks = [];
-
     recorder.addEventListener("dataavailable", (e) => e.data.size && chunks.push(e.data));
     recorder.addEventListener("stop", async () => {
       stream.getTracks().forEach((t) => t.stop());
       state.recording = false;
       button.dataset.recording = "false";
       hint.textContent = "Transcribing…";
-
       const form = new FormData();
       form.append("audio", new Blob(chunks, { type: "audio/webm" }), "speech.webm");
-      const thinking = thinkingBubble("listening…");
+      const pending = thinking("listening…");
       try {
         const reply = await apiJson("/api/voice", { method: "POST", body: form });
-        thinking.remove();
+        pending.remove();
         hint.textContent = "";
         if (reply.transcript) addBubble("user", reply.transcript);
         addBubble("assistant", reply.reply, reply.agents_called || []);
         afterReply(reply);
       } catch (error) {
-        thinking.remove();
+        pending.remove();
         hint.textContent = `Voice failed: ${error.message}`;
       }
     });
-
     recorder.start();
     state.recorder = recorder;
     state.recording = true;
     button.dataset.recording = "true";
-    hint.textContent = "Listening — click again when you're done.";
+    hint.textContent = "Listening — click again when done.";
   } catch {
-    hint.textContent = "Microphone permission was refused.";
+    hint.textContent = "Microphone permission refused.";
   }
 }
 
 /* --- live stream ----------------------------------------------------------- */
+
+function setDoor(open, title, sub) {
+  state.doorOpen = open;
+  $("door-pill").dataset.state = open ? "open" : "closed";
+  $("door-label").textContent = open ? "Door open" : "Door closed";
+  const banner = $("scan-banner");
+  banner.hidden = !open;
+  if (open) {
+    $("scan-title").textContent = title || "Door open";
+    $("scan-sub").textContent = sub || "Comparing frames";
+  }
+}
 
 function connectStream() {
   const source = new EventSource("/api/stream");
@@ -604,29 +732,29 @@ function connectStream() {
 
     switch (event.kind) {
       case "door_opened":
-        setDoor("open", "Door open", `brightness ${data.brightness}`);
-        break;
-      case "door_closed":
-        setDoor("closed", "Door closed", `brightness ${data.brightness}`);
+        setDoor(true, "Door open", "Watching the shelf");
         break;
       case "analyzing":
-        setDoor("analyzing", "Comparing frames…", "vision agent");
+        setDoor(true, "Door closed", "Comparing frames — vision agent");
+        break;
+      case "door_closed":
         break;
       case "inventory_changed": {
-        setDoor("closed", "Door closed", "");
-        (data.added || []).forEach((i) => toast(`${i.name} went in — ${i.days_left ?? "?"} days`, "good"));
+        setDoor(false);
+        (data.added || []).forEach((i) =>
+          toast(`${i.name} went in — ${tierOf(i.days_left).words.toLowerCase()}`, "good"));
         (data.removed || []).forEach((i) => toast(`${i.name} came out`, "info"));
         (data.ignored || []).forEach((n) => toast(`Ignored ${n}`, "info"));
         refresh();
         break;
       }
       case "needs_confirmation":
-        toast("The fridge is not sure about something", "warn");
+        setDoor(false);
         refresh();
         break;
       case "camera_status":
         state.camera = data;
-        renderStatus();
+        $("btn-camera").textContent = data.running ? "Stop camera" : "Start camera";
         break;
       default:
         break;
@@ -634,7 +762,7 @@ function connectStream() {
   });
 
   source.addEventListener("error", () => {
-    /* EventSource reconnects on its own; nothing to do but wait. */
+    /* EventSource reconnects on its own */
   });
 }
 
@@ -651,11 +779,11 @@ async function refresh() {
 function wire() {
   $("composer").addEventListener("submit", (e) => {
     e.preventDefault();
-    send($("chat-input").value);
+    send($("chat-text").value);
   });
 
-  $("quick-chips").addEventListener("click", (e) => {
-    const chip = e.target.closest(".chip");
+  $("chat-chips").addEventListener("click", (e) => {
+    const chip = e.target.closest(".ghost-chip");
     if (chip) send(chip.dataset.say);
   });
 
@@ -665,7 +793,7 @@ function wire() {
     const running = state.camera.running;
     const result = await apiJson(`/api/camera/${running ? "stop" : "start"}`, { method: "POST" });
     state.camera = result;
-    renderStatus();
+    $("btn-camera").textContent = result.running ? "Stop camera" : "Start camera";
     if (!running && !result.running) {
       toast(result.error || "No camera found. Use a simulated cycle instead.", "warn");
     }
@@ -673,24 +801,25 @@ function wire() {
 
   $("btn-seed").addEventListener("click", async () => {
     await apiJson("/api/demo/seed", { method: "POST" });
-    state.knownItemIds = new Set();
+    state.seenItemIds = null;
+    state.recipes = [];
+    renderRecipes();
     toast("Demo fridge reloaded", "good");
     refresh();
   });
 
   $("btn-digest").addEventListener("click", async () => {
-    const thinking = thinkingBubble("writing the briefing…");
+    const pending = thinking("writing the briefing…");
     try {
       const digest = await apiJson("/api/digest");
-      thinking.remove();
+      pending.remove();
       const lines = [digest.headline, ...(digest.alerts || []).map((a) => `• ${a.line}`)];
       if (digest.suggestion) lines.push(digest.suggestion);
       const text = lines.filter(Boolean).join("\n");
       addBubble("assistant", text, ["sentinel"]);
-      flashRoster(["sentinel"]);
-      if ($("tts-toggle").checked && state.modelAvailable) speak(text);
+      if (state.modelAvailable) speak(text);
     } catch (error) {
-      thinking.remove();
+      pending.remove();
       addBubble("assistant", `Could not write the briefing: ${error.message}`);
     }
   });
@@ -705,22 +834,21 @@ function wire() {
     const form = new FormData();
     form.append("frame_before", files[0]);
     form.append("frame_after", files[1]);
-    $("toolbar-hint").textContent = "Comparing the two frames…";
-    setDoor("analyzing", "Comparing frames…", "vision agent");
+    $("control-hint").textContent = "Comparing the two frames…";
+    setDoor(true, "Door closed", "Comparing frames — vision agent");
     try {
       const result = await apiJson("/api/door/simulate", { method: "POST", body: form });
       const changes = (result.added?.length || 0) + (result.removed?.length || 0);
-      $("toolbar-hint").textContent = changes
+      $("control-hint").textContent = changes
         ? `${changes} change${changes > 1 ? "s" : ""} committed.`
         : result.questions?.length
           ? "The fridge has a question."
           : "No change detected between those frames.";
-      setDoor("closed", "Door closed", "");
-      refresh();
     } catch (error) {
-      $("toolbar-hint").textContent = `That failed: ${error.message}`;
-      setDoor("closed", "Door closed", "");
+      $("control-hint").textContent = `That failed: ${error.message}`;
     }
+    setDoor(false);
+    refresh();
     e.target.value = "";
   });
 }
@@ -730,13 +858,13 @@ async function boot() {
   connectStream();
   try {
     const { agents } = await apiJson("/api/agents");
-    renderRoster(agents, []);
+    renderRoster(agents);
   } catch {
-    /* roster is decoration; the dashboard works without it */
+    /* the roster is decoration */
   }
   await refresh();
   if (!state.modelAvailable) {
-    toast("No OPENAI_API_KEY - the fridge runs, but the agents are offline.", "warn");
+    toast("No model key set — the fridge runs, but the agents are offline.", "warn");
   }
 }
 

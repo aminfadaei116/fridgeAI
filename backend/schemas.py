@@ -77,6 +77,10 @@ class InventoryItem(BaseModel):
     est_cost: float
     storage_tip: str = ""
     removal_count: int = 0
+    frame_ref: str | None = Field(
+        default=None,
+        description="Camera frame captured when this item went in, served by /api/frames",
+    )
 
     @property
     def days_left(self) -> int | None:
