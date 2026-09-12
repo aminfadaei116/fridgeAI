@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" data-theme="dark">
+<html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -9,153 +9,120 @@
 </head>
 <body>
 
-<header class="topbar">
-  <div class="brand">
-    <span class="brand-mark" aria-hidden="true"></span>
-    <div>
+<main class="frame">
+
+  <header class="head">
+    <div class="head-left">
       <h1>Fridge Agent</h1>
-      <p class="brand-sub">Seven agents watching one fridge</p>
+      <p class="mono head-scan" id="head-scan">no scans yet</p>
     </div>
-  </div>
-
-  <div class="status-strip">
-    <div class="door-pill" id="door-pill" data-state="closed">
-      <span class="door-led" aria-hidden="true"></span>
-      <span class="door-text" id="door-text">Door closed</span>
-      <span class="door-meta" id="door-meta">—</span>
-    </div>
-    <div class="pill" id="camera-pill" data-ok="false">
-      <span class="dot" aria-hidden="true"></span><span id="camera-text">Camera off</span>
-    </div>
-    <div class="pill" id="model-pill" data-ok="false">
-      <span class="dot" aria-hidden="true"></span><span id="model-text">Model offline</span>
-    </div>
-  </div>
-</header>
-
-<div class="toolbar">
-  <button class="btn" id="btn-camera">Start camera</button>
-  <label class="btn btn-ghost" for="sim-input">Simulate a door cycle</label>
-  <input type="file" id="sim-input" accept="image/*" multiple hidden />
-  <button class="btn btn-ghost" id="btn-digest">Today's briefing</button>
-  <button class="btn btn-ghost" id="btn-seed">Reset demo fridge</button>
-  <span class="toolbar-hint" id="toolbar-hint">Pick two photos: before, then after.</span>
-</div>
-
-<section class="kpi-row" aria-label="Waste ledger, last 7 days">
-  <article class="kpi kpi-hero">
-    <p class="kpi-label">Used in time · 7 days</p>
-    <p class="kpi-value" id="kpi-saved">$0.00</p>
-    <p class="kpi-note" id="kpi-saved-note">0 items</p>
-  </article>
-  <article class="kpi">
-    <p class="kpi-label">Thrown out · 7 days</p>
-    <p class="kpi-value kpi-loss" id="kpi-wasted">$0.00</p>
-    <p class="kpi-note" id="kpi-wasted-note">0 items</p>
-  </article>
-  <article class="kpi">
-    <p class="kpi-label">In the fridge</p>
-    <p class="kpi-value" id="kpi-count">0</p>
-    <p class="kpi-note" id="kpi-count-note">tracked items</p>
-  </article>
-  <article class="kpi kpi-split">
-    <p class="kpi-label">Where the money went</p>
-    <div class="split-bar" id="split-bar" role="img" aria-label="Proportion of food value used versus thrown out">
-      <span class="split-seg split-saved" id="split-saved" style="width:50%"></span>
-      <span class="split-seg split-wasted" id="split-wasted" style="width:50%"></span>
-    </div>
-    <div class="split-legend">
-      <span><i class="swatch sw-good" aria-hidden="true"></i>Used <b id="split-saved-pct">—</b></span>
-      <span><i class="swatch sw-critical" aria-hidden="true"></i>Wasted <b id="split-wasted-pct">—</b></span>
-    </div>
-  </article>
-</section>
-
-<section class="confirm-zone" id="confirm-zone" hidden aria-live="polite"></section>
-
-<main class="grid">
-
-  <section class="col col-wide">
-    <article class="card">
-      <header class="card-head">
-        <h2>Spoiling soon</h2>
-        <span class="card-sub" id="expiring-count">—</span>
-      </header>
-      <div id="expiring-list" class="expiry-list"></div>
-      <div class="urgency-key" aria-label="Urgency key">
-        <span><i class="glyph g-critical" aria-hidden="true">■</i>Today or tomorrow</span>
-        <span><i class="glyph g-warning" aria-hidden="true">▲</i>2–3 days</span>
-        <span><i class="glyph g-good" aria-hidden="true">●</i>Fresh</span>
+    <div class="head-right">
+      <p class="mono head-profile" id="head-profile"></p>
+      <div class="door-pill" id="door-pill" data-state="closed">
+        <span class="door-dot" aria-hidden="true"></span>
+        <span id="door-label">Door closed</span>
       </div>
-    </article>
+    </div>
+  </header>
 
-    <article class="card">
-      <header class="card-head">
-        <h2>Everything inside</h2>
-        <span class="card-sub" id="inventory-count">—</span>
-      </header>
-      <div id="inventory-list" class="inv-list"></div>
-    </article>
+  <section class="scan-banner" id="scan-banner" hidden aria-live="polite">
+    <span class="sweep" aria-hidden="true"></span>
+    <div class="scan-copy">
+      <p class="scan-title" id="scan-title">Door open</p>
+      <p class="scan-sub" id="scan-sub">Comparing frames</p>
+    </div>
+    <div class="scan-dots" aria-hidden="true"><i></i><i></i><i></i></div>
   </section>
 
-  <section class="col col-chat">
-    <article class="card card-chat">
-      <header class="card-head">
-        <h2>Talk to the fridge</h2>
-        <label class="switch">
-          <input type="checkbox" id="tts-toggle" checked />
-          <span>Speak replies</span>
-        </label>
-      </header>
+  <section class="stat-band" aria-label="Headline numbers">
+    <div class="stat">
+      <p class="stat-num" id="stat-today">0</p>
+      <p class="stat-cap" id="stat-today-cap">items tracked</p>
+    </div>
+    <div class="stat">
+      <p class="stat-num is-saved" id="stat-saved">$0.00</p>
+      <p class="stat-cap" id="stat-saved-cap">saved in 7 days</p>
+    </div>
+    <div class="stat">
+      <p class="stat-num is-wasted" id="stat-wasted">$0.00</p>
+      <p class="stat-cap" id="stat-wasted-cap">wasted in 7 days</p>
+    </div>
+  </section>
 
-      <div class="chat-log" id="chat-log" aria-live="polite"></div>
+  <div class="body">
 
-      <div class="chips" id="quick-chips">
-        <button class="chip" data-say="What's going off first?">What's going off first?</button>
-        <button class="chip" data-say="Four guests tonight, vegetarian. What can I make?">4 guests, vegetarian</button>
-        <button class="chip" data-say="Plan breakfast, lunch and dinner for tomorrow using what expires soonest.">Plan my day</button>
-        <button class="chip" data-say="I'm aiming for about 1800 calories a day. Keep that in mind from now on.">Set my diet</button>
-        <button class="chip" data-say="How much have I wasted this week?">Waste report</button>
+    <div class="col-main">
+      <div id="confirm-zone" aria-live="polite"></div>
+
+      <div class="section-head">
+        <h2>Eat these next</h2>
+        <p class="mono section-count" id="items-count"></p>
       </div>
+      <div id="items"></div>
 
-      <form class="composer" id="composer">
-        <button type="button" class="mic" id="btn-mic" title="Hold to speak" aria-label="Record a voice message">
-          <span class="mic-icon" aria-hidden="true">●</span>
-        </button>
-        <input id="chat-input" type="text" autocomplete="off"
-               placeholder="Tell it about tonight — guests, diet, cravings…" />
-        <button class="btn" type="submit" id="btn-send">Send</button>
-      </form>
-      <p class="composer-hint" id="composer-hint"></p>
-    </article>
+      <div class="section-head" id="recipes-head">
+        <h2>Today's menu</h2>
+        <div class="section-aside">
+          <p class="mono section-count" id="recipes-count"></p>
+          <button class="ghost-chip" id="btn-replan">Re-plan</button>
+        </div>
+      </div>
+      <div id="recipes"></div>
+    </div>
 
-    <article class="card" id="recipe-card" hidden>
-      <header class="card-head">
-        <h2>On the menu</h2>
-        <span class="card-sub" id="recipe-sub">—</span>
-      </header>
-      <div id="recipe-list" class="recipe-list"></div>
-    </article>
-  </section>
+    <aside class="col-side">
+      <section class="block">
+        <p class="mono block-label">waste ledger · 7 days</p>
+        <div id="ledger"></div>
+      </section>
 
-  <section class="col col-rail">
-    <article class="card">
-      <header class="card-head"><h2>The roster</h2></header>
-      <ul class="roster" id="roster"></ul>
-    </article>
+      <section class="block">
+        <p class="mono block-label">activity</p>
+        <div id="activity"></div>
+      </section>
 
-    <article class="card">
-      <header class="card-head">
-        <h2>Activity</h2>
-        <span class="card-sub">live</span>
-      </header>
-      <ul class="feed" id="feed"></ul>
-    </article>
-  </section>
+      <section class="block">
+        <p class="mono block-label">ask the fridge</p>
+        <div class="chat-card">
+          <div class="chat-log" id="chat-log" aria-live="polite"></div>
+          <div class="chat-chips" id="chat-chips">
+            <button class="ghost-chip" data-say="What's going off first?">What's going off first?</button>
+            <button class="ghost-chip" data-say="Four guests tonight, vegetarian. What can I make?">4 guests, vegetarian</button>
+            <button class="ghost-chip" data-say="How much have I wasted this week?">Waste report</button>
+          </div>
+          <form class="chat-input" id="composer">
+            <input id="chat-text" type="text" autocomplete="off" placeholder="Ask about what's inside…" />
+            <button type="button" class="mic" id="btn-mic" aria-label="Speak to the fridge">
+              <span aria-hidden="true">●</span>
+            </button>
+            <button type="submit" class="send" id="btn-send">Ask</button>
+          </form>
+          <p class="chat-hint mono" id="chat-hint"></p>
+        </div>
+      </section>
 
+      <section class="block">
+        <p class="mono block-label">seven agents</p>
+        <div id="roster"></div>
+      </section>
+
+      <section class="block">
+        <p class="mono block-label">controls</p>
+        <div class="controls">
+          <button class="ghost-chip" id="btn-camera">Start camera</button>
+          <label class="ghost-chip" for="sim-input">Simulate a door cycle</label>
+          <input type="file" id="sim-input" accept="image/*" multiple hidden />
+          <button class="ghost-chip" id="btn-digest">Today's briefing</button>
+          <button class="ghost-chip" id="btn-seed">Reset demo fridge</button>
+        </div>
+        <p class="mono control-hint" id="control-hint">Pick two photos: before, then after.</p>
+      </section>
+    </aside>
+
+  </div>
 </main>
 
-<div class="toast-stack" id="toast-stack" aria-live="polite"></div>
+<div class="toasts" id="toasts" aria-live="polite"></div>
 
 <script src="/static/app.js" type="module"></script>
 </body>

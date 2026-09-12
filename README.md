@@ -155,6 +155,14 @@ red/amber/green scheme returns a deuteranopia separation of ΔE 4.1 between "spo
 channels: the status colour, a distinct glyph (`■ ▲ ●`), and the day count spelled out in
 words. Colour is confirmation, never the message.
 
+**The menu arrives on its own.** Breakfast, lunch and dinner with two options each are
+built every day around whatever is closest to spoiling — you never have to ask. A full board
+is two model calls over the whole fridge, so it is cached per day and `/api/today` returns in
+about 15ms; a miss starts a background plan and the dashboard fills in when `plan_ready`
+arrives on the event stream. The board is invalidated by the date rolling over **and** by the
+fridge changing, because a menu built around spinach is the wrong menu once the spinach has
+been eaten. A door cycle that commits a change re-plans automatically.
+
 **Shelf life is seeded, not asked.** [54 common foods](data/shelf_life_seed.json) ship with the
 repo with their fridge life, typical cost and a storage tip. A cache miss falls through to a
 model call and is then cached forever. Putting a pepper on the board never waits on a network
@@ -185,6 +193,7 @@ not an opening for an opinion.
 | `POST` | `/api/voice` | Speak to it: transcribe → route → reply |
 | `POST` | `/api/speak` | Text to speech for the reply |
 | `POST` | `/api/plan` | The form-shaped twin of asking the chef in the chat |
+| `GET` | `/api/today` | Today's menu — cached, returns instantly, replans in the background |
 | `GET` | `/api/digest` | Today's spoilage briefing |
 | `POST` | `/api/pending/{id}` | Answer a question the curator asked |
 | `POST` | `/api/items` · `DELETE /api/items/{id}` | Manual override when the camera is wrong |
@@ -217,6 +226,7 @@ backend/
   llm.py         the only place that talks to OpenAI
   main.py        FastAPI; every route is a few lines
 frontend/        vanilla HTML/CSS/JS dashboard, no build step
+docs/DESIGN.md   the visual spec the dashboard is built to
 data/            shelf-life seed table + the demo fixture
 docs/DEMO.md     the two-minute run sheet
 ```

@@ -7,6 +7,8 @@ function for simulated cycles, so the demo path and the real path are the same c
 from __future__ import annotations
 
 import logging
+import threading
+from datetime import date
 from pathlib import Path
 
 from backend.agents import (
@@ -22,7 +24,7 @@ from backend.agents import (
 from backend.agents.curator import CurationResult
 from backend.capture import DoorWatcher
 from backend.events import bus
-from backend.schemas import VisionDiff
+from backend.schemas import MealRequest, VisionDiff
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +42,7 @@ class FridgePipeline:
         self.sentinel = SentinelAgent(self.ctx)
         self.concierge = ConciergeAgent(self.ctx)
         self.watcher = DoorWatcher(self.process_cycle, self.ctx.settings, on_state=self._on_state)
+        self._planning = threading.Lock()
 
         self.shelf_life.seed()
 
@@ -66,6 +69,11 @@ class FridgePipeline:
 
         result = self.curator.reconcile(diff, frame_ref=frame_after.name)
         self._publish_result(result, diff)
+
+        # The board is built around what is about to spoil, so a change to the fridge
+        # invalidates it. Rebuild in the background rather than showing a stale plan.
+        if (result.added or result.removed) and self.ctx.llm.available:
+            self.plan_today_async()
         return result
 
     def _publish_result(self, result: CurationResult, diff: VisionDiff) -> None:
@@ -84,6 +92,75 @@ class FridgePipeline:
 
     def _on_state(self, state: str, brightness: float) -> None:
         bus.publish(state, {"brightness": round(brightness, 1)})
+
+    # --- the daily meal plan -------------------------------------------------
+
+    def cached_plan(self) -> dict | None:
+        """Today's board if it is still valid, else None.
+
+        A plan goes stale two ways: the date rolls over, or the fridge changes under it.
+        Both matter - a plan built around spinach is wrong once the spinach is eaten.
+        """
+        plan = self.store.get_daily_plan(date.today().isoformat())
+        if plan is None:
+            return None
+        if plan["signature"] != self.store.inventory_signature():
+            return None
+        return plan
+
+    def plan_today(self, options_per_meal: int = 2) -> dict:
+        """Build breakfast, lunch and dinner around whatever is closest to spoiling.
+
+        Blocking and slow - two model calls over the whole fridge. Callers that must stay
+        responsive should use `plan_today_async`.
+        """
+        profile = self.store.get_profile()
+        request = MealRequest(
+            meals=["breakfast", "lunch", "dinner"],
+            servings=int(profile.get("household_size") or 2),
+            diet=[profile["diet_plan"]] if profile.get("diet_plan") else [],
+            exclude=list(profile.get("allergies") or []),
+            calorie_target=profile.get("daily_calorie_target"),
+        )
+
+        board = self.chef.propose(request, options_per_meal=options_per_meal, profile=profile)
+        nutrition = self.nutritionist.review(board.recipes, request)
+
+        payload = {
+            "recipes": [r.model_dump(mode="json") for r in board.recipes],
+            "nutrition": nutrition.model_dump(mode="json"),
+        }
+        # Signature is read AFTER generation, so a door cycle mid-plan invalidates it rather
+        # than silently pinning a board to a fridge that has already moved on.
+        self.store.put_daily_plan(
+            date.today().isoformat(), self.store.inventory_signature(), payload
+        )
+        self.store.log_event("planned_day", payload={"recipes": len(board.recipes)})
+        return {"date": date.today().isoformat(), **payload}
+
+    def plan_today_async(self, options_per_meal: int = 2) -> bool:
+        """Kick off a plan on a worker thread. Returns False if one is already running."""
+        if not self._planning.acquire(blocking=False):
+            return False
+
+        def run() -> None:
+            try:
+                bus.publish("plan_started", {})
+                plan = self.plan_today(options_per_meal)
+                bus.publish("plan_ready", {"recipes": len(plan.get("recipes", []))})
+            except Exception as exc:  # a failed plan must not take the process down
+                logger.exception("daily plan failed")
+                bus.publish("plan_failed", {"error": str(exc)})
+            finally:
+                self._planning.release()
+
+        threading.Thread(target=run, daemon=True).start()
+        return True
+
+    @property
+    def planning(self) -> bool:
+        locked = self._planning.locked()
+        return locked
 
     # --- camera --------------------------------------------------------------
 

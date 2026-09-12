@@ -40,4 +40,4 @@ asyncio_mode = "auto"
 filterwarnings = ["ignore::DeprecationWarning"]
 
 [tool.setuptools.packages.find]
-include = ["backend*"]
+include = ["backend*", "data*"]

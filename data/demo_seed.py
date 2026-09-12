@@ -14,8 +14,8 @@ from backend.schemas import Category, DetectedItem
 
 # (name, category, quantity, unit, days it has ALREADY been in the fridge)
 DEMO_ITEMS: list[tuple[str, Category, float, str, int]] = [
-    ("spinach", Category.PRODUCE, 1, "bag", 4),
-    ("mushroom", Category.PRODUCE, 250, "g", 5),
+    ("spinach", Category.PRODUCE, 1, "bag", 5),
+    ("mushroom", Category.PRODUCE, 250, "g", 6),
     ("chicken breast", Category.MEAT, 2, "piece", 1),
     ("greek yogurt", Category.DAIRY, 1, "tub", 12),
     ("milk", Category.DAIRY, 2, "L", 5),

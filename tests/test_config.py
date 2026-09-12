@@ -6,6 +6,9 @@ of model names, and nothing else in the system. These pin that.
 
 from __future__ import annotations
 
+import subprocess
+from pathlib import Path
+
 import pytest
 
 from backend.config import GEMINI_BASE_URL, Settings
@@ -118,3 +121,48 @@ def test__the_suite_is_isolated_from_local_configuration():
     assert settings.llm_provider == "openai"
     assert settings.api_key == ""
     assert settings.has_api_key is False
+
+
+def test__the_cli_runs_from_any_directory(tmp_path):
+    """The README tells people to run `fridge seed` after cloning.
+
+    Running pytest from the repo root puts the root on sys.path, which hides a packaging
+    gap: the console script does not, so a package left out of pyproject imports fine here
+    and fails for everyone who installs the project. Shelling out from an unrelated
+    directory is the only way to catch that.
+    """
+    # Arrange
+    repo_root = Path(__file__).resolve().parent.parent
+    fridge = repo_root / ".venv" / "bin" / "fridge"
+    if not fridge.exists():
+        pytest.skip("no installed console script to exercise")
+
+    # Act: run from a directory that is not the repo.
+    result = subprocess.run(
+        [str(fridge), "--help"], cwd=tmp_path, capture_output=True, text=True, timeout=60
+    )
+
+    # Assert
+    assert result.returncode == 0, result.stderr
+    assert "seed" in result.stdout
+
+
+def test__the_demo_seeder_is_importable_from_the_installed_package(tmp_path):
+    # Arrange
+    repo_root = Path(__file__).resolve().parent.parent
+    python = repo_root / ".venv" / "bin" / "python"
+    if not python.exists():
+        pytest.skip("no virtualenv to exercise")
+
+    # Act: import the seeder with the repo root deliberately NOT on sys.path.
+    result = subprocess.run(
+        [str(python), "-c", "import data.demo_seed; print('ok')"],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+
+    # Assert
+    assert result.returncode == 0, result.stderr
+    assert "ok" in result.stdout
