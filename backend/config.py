@@ -4,10 +4,31 @@ from __future__ import annotations
 
 from functools import lru_cache
 from pathlib import Path
+from typing import Literal
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
+
+Provider = Literal["openai", "gemini"]
+
+# Google ships an OpenAI-compatible surface, so the same SDK and the same structured-output
+# call work against Gemini with nothing but a base URL swap.
+GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai/"
+
+# Per-provider model defaults. Override any of them individually in .env.local.
+PROVIDER_MODELS: dict[str, dict[str, str]] = {
+    "openai": {
+        "vision_model": "gpt-4o",
+        "reasoning_model": "gpt-4o",
+        "fast_model": "gpt-4o-mini",
+    },
+    "gemini": {
+        "vision_model": "gemini-2.5-flash",
+        "reasoning_model": "gemini-2.5-flash",
+        "fast_model": "gemini-2.5-flash-lite",
+    },
+}
 
 
 class Settings(BaseSettings):
@@ -19,12 +40,22 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
+    # Which provider backs the agents. Gemini is reached through its OpenAI-compatible
+    # endpoint, so every model call in the app is unchanged.
+    llm_provider: Provider = "openai"
+
     openai_api_key: str = ""
+    gemini_api_key: str = ""
+    base_url_override: str = ""
 
     # Model routing. Vision and reasoning get the strong model; bulk work gets the cheap one.
-    vision_model: str = "gpt-4o"
-    reasoning_model: str = "gpt-4o"
-    fast_model: str = "gpt-4o-mini"
+    # Left blank, each falls back to the provider default in PROVIDER_MODELS.
+    vision_model: str = ""
+    reasoning_model: str = ""
+    fast_model: str = ""
+
+    # OpenAI-only: Gemini's compatible surface does not serve the audio endpoints, so on
+    # Gemini the dashboard falls back to the browser's own speech engine.
     transcribe_model: str = "whisper-1"
     speech_model: str = "gpt-4o-mini-tts"
     speech_voice: str = "alloy"
@@ -49,8 +80,37 @@ class Settings(BaseSettings):
     offline_mode: bool = False
 
     @property
+    def api_key(self) -> str:
+        """The key for the selected provider."""
+        chosen = self.gemini_api_key if self.llm_provider == "gemini" else self.openai_api_key
+        return chosen.strip()
+
+    @property
+    def base_url(self) -> str | None:
+        """Where the OpenAI SDK should point. None means OpenAI's own API."""
+        if self.base_url_override.strip():
+            return self.base_url_override.strip()
+        return GEMINI_BASE_URL if self.llm_provider == "gemini" else None
+
+    @property
     def has_api_key(self) -> bool:
-        return bool(self.openai_api_key.strip())
+        return bool(self.api_key)
+
+    @property
+    def supports_audio_endpoints(self) -> bool:
+        """Whether the provider serves /audio/transcriptions and /audio/speech.
+
+        Only OpenAI does. On Gemini the browser's Web Speech API handles both ends, which
+        costs nothing and keeps the voice demo alive.
+        """
+        return self.llm_provider == "openai" and not self.base_url_override.strip()
+
+    def model_post_init(self, _context: object) -> None:
+        """Fill any model left blank with this provider's default."""
+        defaults = PROVIDER_MODELS[self.llm_provider]
+        for field, default in defaults.items():
+            if not getattr(self, field).strip():
+                object.__setattr__(self, field, default)
 
 
 @lru_cache

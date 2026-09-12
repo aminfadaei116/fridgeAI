@@ -299,7 +299,11 @@ class ConciergeAgent(Agent):
     # --- offline path --------------------------------------------------------
 
     def _offline_reply(self, user_text: str) -> ChatReply:
-        """Keyword routing so the dashboard still does something without a key."""
+        """Keyword routing so the dashboard still does something without a working model.
+
+        Reached both when no key is configured and when a configured key is rejected, so the
+        wording must be true in both cases.
+        """
         lowered = user_text.lower()
         cooking_words = ("cook", "recipe", "dinner", "lunch", "breakfast", "meal", "eat", "guest")
 
@@ -309,7 +313,7 @@ class ConciergeAgent(Agent):
             self._recipes = board.recipes
             titles = ", ".join(r.title for r in board.recipes) or "nothing"
             return ChatReply(
-                reply=f"Running without a model key, so this is the offline board: {titles}.",
+                reply=f"I cannot reach the model, so here is the offline board: {titles}.",
                 agents_called=["chef"],
                 recipes=board.recipes,
             )
@@ -321,8 +325,8 @@ class ConciergeAgent(Agent):
         items = self.store.list_inventory()
         return ChatReply(
             reply=(
-                f"No model key is set, so I am limited to what the database knows: "
-                f"{len(items)} items on hand."
+                f"I cannot reach the model right now, so I am limited to what the database "
+                f"knows: {len(items)} items on hand."
             ),
             agents_called=[],
         )

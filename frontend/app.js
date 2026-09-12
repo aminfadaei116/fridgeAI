@@ -88,6 +88,7 @@ function renderAll(data) {
   state.ledger = data.ledger || {};
   state.camera = data.camera || {};
   state.modelAvailable = !!data.model_available;
+  state.provider = data.provider || { name: "openai", server_audio: true };
 
   renderStatus();
   renderLedger();
@@ -134,7 +135,10 @@ function renderStatus() {
 
   const modelPill = $("model-pill");
   modelPill.dataset.ok = String(state.modelAvailable);
-  $("model-text").textContent = state.modelAvailable ? "Model connected" : "No model key";
+  const provider = state.provider || {};
+  $("model-text").textContent = state.modelAvailable
+    ? `${provider.model || "model"} connected`
+    : `No ${provider.name === "gemini" ? "Gemini" : "OpenAI"} key`;
 
   if (!camera.running) setDoor("closed", "Camera idle", "—");
 }
@@ -457,6 +461,10 @@ function renderRecipes(recipes, nutrition) {
 /* --- voice ----------------------------------------------------------------- */
 
 async function speak(text) {
+  // Gemini's OpenAI-compatible surface has no /audio/speech, so fall back to the browser's
+  // own synthesiser. It costs nothing, needs no network, and keeps the demo intact.
+  if (!state.provider?.server_audio) return speakInBrowser(text);
+
   try {
     const response = await api("/api/speak", {
       method: "POST",
@@ -466,8 +474,65 @@ async function speak(text) {
     const audio = new Audio(URL.createObjectURL(await response.blob()));
     audio.play().catch(() => {});   /* autoplay blocked until the user interacts - fine */
   } catch {
-    /* speech is a nicety; never let it break the turn */
+    speakInBrowser(text);           /* speech is a nicety; never let it break the turn */
   }
+}
+
+function speakInBrowser(text) {
+  if (!window.speechSynthesis) return;
+  try {
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.rate = 1.05;
+    window.speechSynthesis.speak(utterance);
+  } catch {
+    /* no synthesiser available - silent is fine */
+  }
+}
+
+/* Browser dictation, used when the provider has no transcription endpoint. Chrome and Edge
+ * expose this; Firefox does not, which is why the caller checks before using it. */
+function browserDictation() {
+  const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!Recognition) return null;
+  const recognition = new Recognition();
+  recognition.lang = navigator.language || "en-US";
+  recognition.interimResults = false;
+  recognition.maxAlternatives = 1;
+  return recognition;
+}
+
+function listenInBrowser() {
+  const recognition = browserDictation();
+  const button = $("btn-mic");
+  const hint = $("composer-hint");
+  if (!recognition) {
+    hint.textContent = "This browser has no speech recognition. Chrome or Edge does, or just type.";
+    return;
+  }
+
+  recognition.addEventListener("result", (event) => {
+    const transcript = event.results[0][0].transcript;
+    if (transcript) send(transcript);
+  });
+  recognition.addEventListener("error", (event) => {
+    hint.textContent =
+      event.error === "not-allowed"
+        ? "Microphone permission was refused."
+        : `Speech recognition failed: ${event.error}`;
+  });
+  recognition.addEventListener("end", () => {
+    state.recording = false;
+    state.recognition = null;
+    button.dataset.recording = "false";
+    if (hint.textContent === "Listening - speak now.") hint.textContent = "";
+  });
+
+  recognition.start();
+  state.recognition = recognition;
+  state.recording = true;
+  button.dataset.recording = "true";
+  hint.textContent = "Listening - speak now.";
 }
 
 async function toggleRecording() {
@@ -476,6 +541,13 @@ async function toggleRecording() {
 
   if (state.recording) {
     state.recorder?.stop();
+    state.recognition?.stop();
+    return;
+  }
+
+  // No server-side transcription on this provider - dictate in the browser instead.
+  if (!state.provider?.server_audio) {
+    listenInBrowser();
     return;
   }
   if (!navigator.mediaDevices?.getUserMedia) {

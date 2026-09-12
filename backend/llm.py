@@ -35,11 +35,24 @@ class LLM:
         return self.settings.has_api_key and not self.settings.offline_mode
 
     @property
+    def provider(self) -> str:
+        return self.settings.llm_provider
+
+    @property
     def client(self) -> OpenAI:
         if not self.available:
-            raise LLMUnavailable("OPENAI_API_KEY is not set (or offline mode is on)")
+            key_name = (
+                "GEMINI_API_KEY" if self.settings.llm_provider == "gemini" else "OPENAI_API_KEY"
+            )
+            raise LLMUnavailable(f"{key_name} is not set (or offline mode is on)")
         if self._client is None:
-            self._client = OpenAI(api_key=self.settings.openai_api_key, timeout=60.0)
+            # Gemini is reached through its OpenAI-compatible endpoint, so the only
+            # difference between providers is this base URL.
+            self._client = OpenAI(
+                api_key=self.settings.api_key,
+                base_url=self.settings.base_url,
+                timeout=60.0,
+            )
         return self._client
 
     # --- structured output ---------------------------------------------------
@@ -106,12 +119,16 @@ class LLM:
         called: list[str] = []
 
         for _ in range(max_rounds):
-            response = self.client.chat.completions.create(
-                model=model or self.settings.reasoning_model,
-                messages=convo,
-                tools=tools,
-                temperature=0.4,
-            )
+            try:
+                response = self.client.chat.completions.create(
+                    model=model or self.settings.reasoning_model,
+                    messages=convo,
+                    tools=tools,
+                    temperature=0.4,
+                )
+            except Exception as exc:  # rejected key, rate limit, network
+                logger.warning("tool loop call failed: %s", exc)
+                raise LLMUnavailable(str(exc)) from exc
             message = response.choices[0].message
             if not message.tool_calls:
                 return message.content or "", called
@@ -139,16 +156,25 @@ class LLM:
                 )
 
         # Ran out of rounds: ask for a plain-language wrap-up of what we have.
-        final = self.client.chat.completions.create(
-            model=model or self.settings.fast_model,
-            messages=[*convo, {"role": "user", "content": "Summarise the result for me now."}],
-            temperature=0.4,
-        )
+        try:
+            final = self.client.chat.completions.create(
+                model=model or self.settings.fast_model,
+                messages=[*convo, {"role": "user", "content": "Summarise the result for me now."}],
+                temperature=0.4,
+            )
+        except Exception as exc:
+            logger.warning("tool loop wrap-up failed: %s", exc)
+            raise LLMUnavailable(str(exc)) from exc
         return final.choices[0].message.content or "", called
 
     # --- speech --------------------------------------------------------------
 
     def transcribe(self, audio_path: Path) -> str:
+        if not self.settings.supports_audio_endpoints:
+            raise LLMUnavailable(
+                f"{self.provider} does not serve /audio/transcriptions - "
+                "the dashboard uses the browser's speech engine instead"
+            )
         with audio_path.open("rb") as handle:
             result = self.client.audio.transcriptions.create(
                 model=self.settings.transcribe_model, file=handle
@@ -156,6 +182,11 @@ class LLM:
         return (result.text or "").strip()
 
     def speak(self, text: str) -> bytes:
+        if not self.settings.supports_audio_endpoints:
+            raise LLMUnavailable(
+                f"{self.provider} does not serve /audio/speech - "
+                "the dashboard uses the browser's speech engine instead"
+            )
         response = self.client.audio.speech.create(
             model=self.settings.speech_model,
             voice=self.settings.speech_voice,

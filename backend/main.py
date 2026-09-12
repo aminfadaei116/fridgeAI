@@ -104,6 +104,12 @@ def read_state() -> dict:
         "messages": store.recent_messages(limit=20),
         "camera": fridge.camera_status(),
         "model_available": fridge.ctx.llm.available,
+        "provider": {
+            "name": settings.llm_provider,
+            "model": settings.reasoning_model,
+            # False on Gemini: it has no /audio/* endpoints, so the browser speaks instead.
+            "server_audio": settings.supports_audio_endpoints,
+        },
     }
 
 
@@ -307,6 +313,10 @@ def speak(body: SpeakBody) -> Response:
         raise HTTPException(status_code=503, detail="speech needs a model key")
     try:
         audio = fridge.ctx.llm.speak(body.text)
+    except LLMUnavailable as exc:
+        # Expected on a provider with no /audio/* endpoints; the dashboard then speaks
+        # in the browser instead. Say which, rather than a generic failure.
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
     except Exception as exc:
         logger.warning("speech synthesis failed: %s", exc)
         raise HTTPException(status_code=502, detail="could not synthesise speech") from exc

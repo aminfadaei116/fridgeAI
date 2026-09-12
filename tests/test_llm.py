@@ -260,3 +260,44 @@ def test__response_schemas__are_legal_under_strict_structured_outputs(schema):
         assert set(node.get("required", [])) == set(node.get("properties", {})), (
             f"{path} has optional properties, which strict mode forbids"
         )
+
+
+def test__tool_loop__reports_an_api_failure_as_unavailable(online_llm):
+    """A rejected key must degrade, not crash the request.
+
+    `structured` already wraps provider errors; without the same treatment here, a typo'd or
+    expired key turns every chat turn into a 500 instead of falling back to the offline path.
+    """
+
+    # Arrange
+    class ExplodingCompletions:
+        def create(self, **kwargs):
+            raise RuntimeError("Error code: 400 - Please pass a valid API key")
+
+    online_llm._client = SimpleNamespace(chat=SimpleNamespace(completions=ExplodingCompletions()))
+
+    # Act / Assert
+    with pytest.raises(LLMUnavailable):
+        online_llm.tool_loop(system="sys", messages=[], tools=[], dispatch={})
+
+
+def test__concierge__falls_back_to_the_offline_path_on_a_bad_key(store, settings, shelf_life):
+    # Arrange: a key that the provider rejects.
+    settings.openai_api_key = "sk-wrong"
+    settings.offline_mode = False
+    store.add_item(detected("spinach"), shelf_life_days=1, est_cost=4.49)
+
+    class ExplodingCompletions:
+        def create(self, **kwargs):
+            raise RuntimeError("Error code: 401 - invalid api key")
+
+    llm = LLM(settings)
+    llm._client = SimpleNamespace(chat=SimpleNamespace(completions=ExplodingCompletions()))
+    concierge = ConciergeAgent(AgentContext(store=store, llm=llm, settings=settings))
+
+    # Act
+    reply = concierge.chat("what should I cook?")
+
+    # Assert: an answer, not an exception.
+    assert reply.reply
+    assert store.recent_messages()[-1]["role"] == "assistant"

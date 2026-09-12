@@ -98,10 +98,41 @@ git clone <this repo> && cd fridgeAI
 uv venv --python 3.12
 uv pip install -e ".[dev]"
 
-cp .env.example .env.local          # add your OPENAI_API_KEY
+cp .env.example .env.local          # add a key (see Providers below)
 .venv/bin/fridge seed               # load a realistic, already-aging fridge
 .venv/bin/fridge serve              # http://127.0.0.1:8000
 ```
+
+### Providers
+
+Either backend runs the whole system. Gemini is reached through its OpenAI-compatible
+endpoint, so the provider seam is a base URL and a set of model names — no second client, no
+branching in any agent.
+
+```bash
+# .env.local — OpenAI
+LLM_PROVIDER=openai
+OPENAI_API_KEY=sk-...
+
+# .env.local — Gemini
+LLM_PROVIDER=gemini
+GEMINI_API_KEY=AIza...
+```
+
+`BASE_URL_OVERRIDE` points the same client at a LiteLLM proxy, an Azure OpenAI deployment, or
+anything else OpenAI-compatible.
+
+**One difference that matters.** Gemini's compatible surface serves no `/audio/*` endpoints, so
+Whisper and TTS are unavailable there. The dashboard detects this from `/api/state` and falls
+back to the browser's own Web Speech API for both dictation and playback — free, offline, and
+the voice demo still works. Chrome and Edge support dictation; Firefox does not, so on Firefox
+with Gemini you type instead.
+
+| | OpenAI | Gemini |
+|---|---|---|
+| Vision diff, recipes, chat, tool calling | yes | yes |
+| Structured outputs | strict schemas | strict schemas |
+| Voice in / out | Whisper + TTS | browser Web Speech API |
 
 No camera? The dashboard's **Simulate a door cycle** button takes two photos from your phone
 and runs the identical pipeline. No API key? Everything still boots — the agents degrade to
