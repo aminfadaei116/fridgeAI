@@ -10,7 +10,7 @@ from __future__ import annotations
 import logging
 
 from backend.agents.base import Agent
-from backend.llm import LLMUnavailable
+from backend.llm import LLMUnavailable, plain_text
 from backend.schemas import DailyDigest, DigestAlert, InventoryItem
 
 logger = logging.getLogger(__name__)
@@ -22,6 +22,8 @@ been taken out and put back, and the week's waste ledger.
 
 Write like someone who has been watching the fridge and has receipts. Cite the evidence: the \
 item, the days, the number of times it has been handled. Dry and specific beats cheerful.
+
+Write plain sentences. No markdown, no asterisks, no stage directions - this is read aloud.
 
 - `headline`: one sentence. The single most useful thing to know this morning.
 - `alerts`: one per item with 3 or fewer days left, most urgent first. Urgency is "today" for
@@ -42,13 +44,18 @@ class SentinelAgent(Agent):
             return self._fallback(expiring)
 
         try:
-            return self.llm.structured(
+            digest = self.llm.structured(
                 schema=DailyDigest,
                 system=SYSTEM,
                 user=self._prompt(expiring),
                 model=self.settings.fast_model,
                 temperature=0.6,
             )
+            digest.headline = plain_text(digest.headline)
+            digest.suggestion = plain_text(digest.suggestion)
+            for alert in digest.alerts:
+                alert.line = plain_text(alert.line)
+            return digest
         except LLMUnavailable as exc:
             logger.warning("digest failed: %s", exc)
             return self._fallback(expiring)

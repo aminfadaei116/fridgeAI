@@ -103,3 +103,18 @@ def test__explicit_model_override__survives_the_provider_default():
 
     # Act / Assert: a model named in the environment is never overwritten by a default.
     assert settings.vision_model == "gemini-3-pro"
+
+
+def test__the_suite_is_isolated_from_local_configuration():
+    """Guard for the isolation fixture itself.
+
+    If this fails, every other config test is silently reading the developer's `.env.local`
+    and the suite proves nothing portable.
+    """
+    # Act: a bare Settings, with no arguments at all.
+    settings = Settings()
+
+    # Assert: the defaults, not whatever is configured on this machine.
+    assert settings.llm_provider == "openai"
+    assert settings.api_key == ""
+    assert settings.has_api_key is False

@@ -6,6 +6,7 @@ from __future__ import annotations
 import base64
 import json
 import logging
+import re
 from pathlib import Path
 from typing import Any, TypeVar
 
@@ -194,6 +195,29 @@ class LLM:
             response_format="mp3",
         )
         return response.read()
+
+
+_MARKDOWN_NOISE = (
+    (re.compile(r"\*\*(.+?)\*\*", re.S), r"\1"),  # **bold**
+    (re.compile(r"__(.+?)__", re.S), r"\1"),  # __bold__
+    (re.compile(r"(?<!\w)\*(?!\s)(.+?)(?<!\s)\*", re.S), r"\1"),  # *italic*
+    (re.compile(r"`{1,3}(.+?)`{1,3}", re.S), r"\1"),  # `code`
+    (re.compile(r"^\s{0,3}#{1,6}\s+", re.M), ""),  # # heading
+    (re.compile(r"^\s{0,3}[-*+]\s+", re.M), ""),  # - bullet
+)
+
+
+def plain_text(text: str) -> str:
+    """Strip markdown emphasis from a model reply.
+
+    The dashboard renders replies as plain text and the browser reads them aloud, so an
+    asterisk is both visible and audible. Gemini in particular emphasises heavily however
+    firmly the prompt asks it not to, which is why this is a function and not a sentence in
+    a system prompt.
+    """
+    for pattern, replacement in _MARKDOWN_NOISE:
+        text = pattern.sub(replacement, text)
+    return text.strip()
 
 
 def image_part(image_path: Path, detail: str = "high") -> dict[str, Any]:

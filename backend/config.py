@@ -24,9 +24,11 @@ PROVIDER_MODELS: dict[str, dict[str, str]] = {
         "fast_model": "gpt-4o-mini",
     },
     "gemini": {
-        "vision_model": "gemini-2.5-flash",
-        "reasoning_model": "gemini-2.5-flash",
-        "fast_model": "gemini-2.5-flash-lite",
+        # The -latest aliases track Google's current flash models, so these do not go stale
+        # the way a pinned version does. Pin explicitly in .env.local if you need to.
+        "vision_model": "gemini-flash-latest",
+        "reasoning_model": "gemini-flash-latest",
+        "fast_model": "gemini-flash-lite-latest",
     },
 }
 

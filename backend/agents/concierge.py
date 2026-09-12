@@ -14,7 +14,7 @@ from backend.agents.base import Agent, AgentContext
 from backend.agents.chef import ChefAgent
 from backend.agents.nutritionist import NutritionAgent
 from backend.agents.sentinel import SentinelAgent
-from backend.llm import LLMUnavailable
+from backend.llm import LLMUnavailable, plain_text
 from backend.schemas import ChatReply, MealRequest, NutritionReport, Recipe
 
 logger = logging.getLogger(__name__)
@@ -38,7 +38,9 @@ How to work:
 
 How to speak:
 - Short. Two or three sentences, then the substance. This is read on a screen and heard aloud,
-  so no lists of headings, no markdown, no emoji.
+  so write plain sentences: no markdown, no asterisks, no bullet lists, no headings, no emoji.
+- You are a fridge, not an actor. Never narrate your own actions or set a scene - no stage
+  directions, no "*hums softly*", no describing the door opening. Just answer.
 - Lead with the evidence you actually have: the item, the days left, the dollar figure.
 - You may be dry and a little pointed about food going to waste - that is the job. You are never
   pointed about the person. No remarks about their weight, their discipline, or whether they
@@ -189,6 +191,7 @@ class ConciergeAgent(Agent):
             self.store.add_message("assistant", reply.reply)
             return reply
 
+        text = plain_text(text)
         self.store.add_message("assistant", text)
         return ChatReply(
             reply=text,

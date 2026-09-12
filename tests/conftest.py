@@ -13,6 +13,36 @@ from backend.db import Store
 from backend.llm import LLM
 from backend.schemas import DetectedItem
 
+# Environment variables that would otherwise leak a developer's real provider choice - and
+# real API key - into the suite.
+_PROVIDER_ENV = (
+    "LLM_PROVIDER",
+    "OPENAI_API_KEY",
+    "GEMINI_API_KEY",
+    "BASE_URL_OVERRIDE",
+    "VISION_MODEL",
+    "REASONING_MODEL",
+    "FAST_MODEL",
+    "TRANSCRIBE_MODEL",
+    "SPEECH_MODEL",
+    "OFFLINE_MODE",
+)
+
+
+@pytest.fixture(autouse=True)
+def isolate_environment(monkeypatch):
+    """Cut every test off from `.env.local` and the ambient environment.
+
+    Without this the suite reads whichever provider the developer happens to have configured,
+    so results differ per machine - and a test that builds a client could make a real, billed
+    API call with their key.
+    """
+    monkeypatch.setattr(
+        Settings, "model_config", {**Settings.model_config, "env_file": None}, raising=False
+    )
+    for name in _PROVIDER_ENV:
+        monkeypatch.delenv(name, raising=False)
+
 
 @pytest.fixture
 def settings(tmp_path) -> Settings:
