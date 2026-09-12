@@ -6,8 +6,67 @@
   <title>Fridge Agent</title>
   <link rel="stylesheet" href="/static/styles.css" />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>🧊</text></svg>" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght,SOFT@9..144,300..900,0..100&family=Figtree:wght@400..900&display=swap"
+    rel="stylesheet"
+  />
+  <link rel="stylesheet" href="/static/vivid-nightfall-team.css" />
+  <style>
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+    :root {
+      --font-finance-display: "Fraunces", ui-serif, Georgia, serif;
+      --font-finance-text: "Figtree", ui-sans-serif, system-ui, sans-serif;
+    }
+
+    /* Re-theme the team section onto the site's own warm-neutral / agent-blue
+       palette instead of its default violet, and frame it like the rest of
+       the page's card-on-paper layout. */
+    .finance.finance-band {
+      --color-finance-ground: var(--surface);
+      --color-finance-surface: var(--surface-side);
+      --color-finance-raised: var(--paper);
+      --color-finance-deep: var(--surface);
+      --color-finance-line: var(--border);
+      --color-finance-glow: var(--agent-edge);
+      --color-finance-accent: var(--agent);
+      --color-finance-on-accent: var(--surface);
+      --color-finance-ink: var(--ink);
+      --color-finance-muted: var(--ink-3);
+
+      max-width: 1280px;
+      margin: 24px auto 0;
+      border: 1px solid var(--border);
+      border-radius: 22px;
+      box-shadow: 0 22px 60px -30px oklch(0.4 0.02 85 / 0.4);
+    }
+  </style>
 </head>
 <body>
+
+<nav class="site-nav">
+  <div class="site-nav-inner">
+    <a class="site-nav-brand" href="#">
+      <span aria-hidden="true">🧊</span> Fridge Agent
+    </a>
+    <div class="site-nav-links">
+      <a href="#inventory">Inventory</a>
+      <a href="#ask-fridge">Ask the fridge</a>
+      <a href="#team">Team</a>
+    </div>
+  </div>
+</nav>
 
 <main class="frame">
 
@@ -51,7 +110,7 @@
 
   <div class="body">
 
-    <div class="col-main">
+    <div class="col-main" id="inventory">
       <div id="confirm-zone" aria-live="polite"></div>
 
       <div class="section-head">
@@ -81,7 +140,7 @@
         <div id="activity"></div>
       </section>
 
-      <section class="block">
+      <section class="block" id="ask-fridge">
         <p class="mono block-label">ask the fridge</p>
         <div class="chat-card">
           <div class="chat-log" id="chat-log" aria-live="polite"></div>
@@ -122,8 +181,67 @@
   </div>
 </main>
 
+<section class="finance finance-band" id="team">
+  <div class="finance-wrap">
+    <div id="finance-team-frame"></div>
+  </div>
+</section>
+
 <div class="toasts" id="toasts" aria-live="polite"></div>
 
 <script src="/static/app.js" type="module"></script>
+<script type="module">
+  import { renderFinanceTeam } from "/static/vivid-nightfall-team.js";
+
+  const TEAM = [
+    {
+      id: "1",
+      name: "Amin Shamshiri",
+      role: "Full-Stack Software Engineer",
+      title: null,
+      bio: null,
+      photo: "/static/team/amin-shamshiri.jpeg",
+      links: [],
+    },
+    {
+      id: "2",
+      name: "Aida Mohammadshahi",
+      role: "Machine Learning Developer",
+      title: null,
+      bio: null,
+      photo: "/static/team/aida-mohammadshahi.jpeg",
+      links: [],
+    },
+    {
+      id: "3",
+      name: "Amir Shahbandegan",
+      role: "Tech Lead, AI & Agentic Systems",
+      title: null,
+      bio: null,
+      photo: "/static/team/amir-shahbandegan.jpeg",
+      links: [],
+    },
+    {
+      id: "4",
+      name: "Omid Omidi",
+      role: "Staff AI & Data Platform Engineer",
+      title: null,
+      bio: null,
+      photo: "/static/team/omid-omidi.jpeg",
+      links: [],
+    },
+    {
+      id: "5",
+      name: "Amin Fadaeinejad",
+      role: "Sr. ML Researcher",
+      title: null,
+      bio: null,
+      photo: "/static/team/amin-fadaeinejad.jpeg",
+      links: [],
+    },
+  ];
+
+  renderFinanceTeam(document.getElementById("finance-team-frame"), TEAM);
+</script>
 </body>
 </html>

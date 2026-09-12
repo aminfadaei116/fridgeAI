@@ -73,6 +73,58 @@ body {
 
 h1, h2 { margin: 0; letter-spacing: -0.02em; }
 
+/* --- site nav ---------------------------------------------------------------- */
+
+.site-nav {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  background: color-mix(in oklab, var(--paper), transparent 12%);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--hairline);
+  margin: -28px -22px 24px;
+  padding-inline: 22px;
+}
+
+.site-nav-inner {
+  max-width: 1280px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 14px 10px;
+}
+
+.site-nav-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 680;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.site-nav-links {
+  display: flex;
+  align-items: center;
+  gap: 26px;
+}
+
+.site-nav-links a {
+  font-size: 13.5px;
+  font-weight: 550;
+  color: var(--ink-2);
+  text-decoration: none;
+  letter-spacing: -0.005em;
+  transition: color 160ms ease;
+}
+
+.site-nav-links a:hover { color: var(--agent-fill); }
+
 .mono {
   font-family: var(--mono);
   letter-spacing: 0.1em;
