@@ -158,6 +158,7 @@ a:hover { color: var(--green-dark); }
   font-size: 13px; font-weight: 700; white-space: nowrap;
 }
 .btn-soft:hover { background: #d1e9d8; }
+.link-soft { display: inline-block; text-decoration: none; }
 
 /* --- door banner ----------------------------------------------------------- */
 

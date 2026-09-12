@@ -1,0 +1,926 @@
+/*
+ * Vivid Nightfall — Team section, standalone.
+ *
+ * Ported from a Next.js/Tailwind v4 codebase to plain CSS. Everything is
+ * scoped under `.finance` (rename if you like — just do it consistently in
+ * the CSS and the HTML/JS) so it can drop into any page without leaking
+ * variables onto the rest of the site.
+ *
+ * Toggle dark mode by adding class="dark" to <html> (or change the
+ * `html.dark .finance` selector below to whatever your project uses).
+ *
+ * Requires the Fraunces + Figtree fonts (see the HTML file's <link> tag) and
+ * a browser with `animation-timeline: view()` / `@property` support for the
+ * scroll-reveal and dwell-ring effects (Chrome/Edge 115+, Safari 18+,
+ * Firefox 141+). Everything degrades gracefully without it — content simply
+ * renders in place with no rack-focus animation.
+ */
+
+/* ---------------------------------------------------------------------------
+ * Tokens
+ * ------------------------------------------------------------------------- */
+.finance {
+  --color-finance-ground: #f8f5ff;
+  --color-finance-surface: #efe8ff;
+  --color-finance-raised: #dbd4ff;
+  --color-finance-deep: #ffffff;
+  --color-finance-line: #c77dff;
+  --color-finance-glow: #c77dff;
+  --color-finance-accent: #7b2cbf;
+  --color-finance-on-accent: #f8f5ff;
+  --color-finance-ink: #240046;
+  --color-finance-muted: #5a189a;
+
+  --finance-open: 0;
+  --finance-blur-far: 0px;
+  --finance-sat-far: 0.32;
+  --finance-scale-far: 0.94;
+  --finance-lift-far: 3.25rem;
+  --finance-bokeh-alpha: 0.055;
+  --finance-bloom: 0 0 0 transparent;
+  --finance-cast: 0 1.25rem 2.5rem -1.5rem color-mix(in oklab, var(--color-finance-ink), transparent 72%);
+
+  --finance-r: 0.875rem;
+  --finance-measure: 82rem;
+  --finance-hair: color-mix(in oklab, var(--color-finance-line), transparent 62%);
+
+  position: relative;
+  isolation: isolate;
+  background-color: var(--color-finance-ground);
+  color: var(--color-finance-ink);
+  font-family: var(--font-finance-text, Figtree), ui-sans-serif, system-ui, sans-serif;
+  font-size: 1rem;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-optical-sizing: auto;
+}
+
+html.dark .finance {
+  --color-finance-ground: #160029;
+  --color-finance-surface: #240046;
+  --color-finance-raised: #3c096c;
+  --color-finance-deep: #0d0018;
+  --color-finance-line: #5a189a;
+  --color-finance-glow: #6a20b3;
+  --color-finance-accent: #c77dff;
+  --color-finance-on-accent: #160029;
+  --color-finance-ink: #f4eeff;
+  --color-finance-muted: #b6a2da;
+
+  --finance-open: 1;
+  --finance-blur-far: 7px;
+  --finance-sat-far: 1.15;
+  --finance-scale-far: 1.03;
+  --finance-bokeh-alpha: 0.16;
+  --finance-bloom: 0 0 2.5rem -0.5rem color-mix(in oklab, var(--color-finance-glow), transparent 55%);
+  --finance-cast: 0 0 0 transparent;
+}
+
+.finance ::selection {
+  background-color: color-mix(in oklab, var(--color-finance-accent), transparent 65%);
+  color: var(--color-finance-ink);
+}
+
+/* ---------------------------------------------------------------------------
+ * Typography / label voice
+ * ------------------------------------------------------------------------- */
+.finance-display {
+  font-family: var(--font-finance-display, Fraunces), ui-serif, Georgia, serif;
+  font-variation-settings: "SOFT" 60;
+  font-weight: 600;
+  line-height: 1.06;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+}
+
+.finance-display-lg {
+  font-size: clamp(1.875rem, 4.4vw, 3.5rem);
+  font-variation-settings: "SOFT" 60;
+  font-weight: 600;
+  line-height: 1.04;
+  letter-spacing: -0.02em;
+}
+
+.finance-display-md {
+  font-size: clamp(1.25rem, 2.1vw, 1.75rem);
+  font-variation-settings: "SOFT" 60;
+  font-weight: 600;
+  line-height: 1.15;
+  letter-spacing: -0.015em;
+}
+
+.finance-label {
+  font-family: var(--font-finance-text, Figtree), ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  line-height: 1.5;
+  text-transform: uppercase;
+  color: var(--color-finance-muted);
+}
+
+.finance-figures {
+  font-variant-numeric: tabular-nums;
+}
+
+.text-finance-accent {
+  color: var(--color-finance-accent);
+}
+.text-finance-ink {
+  color: var(--color-finance-ink);
+}
+.text-finance-muted {
+  color: var(--color-finance-muted);
+}
+
+/* ---------------------------------------------------------------------------
+ * Layout primitives
+ * ------------------------------------------------------------------------- */
+.finance-wrap {
+  width: 100%;
+  max-width: var(--finance-measure);
+  margin-inline: auto;
+  padding-inline: 1.25rem;
+}
+
+@media (min-width: 40rem) {
+  .finance-wrap {
+    padding-inline: 2rem;
+  }
+}
+
+@media (min-width: 80rem) {
+  .finance-wrap {
+    padding-inline: 3rem;
+  }
+}
+
+.finance-band {
+  position: relative;
+  padding-block: clamp(4.5rem, 10vw, 8.5rem);
+}
+
+.finance-plate {
+  position: relative;
+  border-radius: var(--finance-r);
+  background-color: var(--color-finance-surface);
+  border: 1px solid var(--finance-hair);
+  box-shadow: var(--finance-bloom), var(--finance-cast);
+}
+
+/* Hover/press affordance shared by every pressable element. */
+.finance-press {
+  transition:
+    border-color 220ms ease,
+    box-shadow 260ms ease,
+    transform 260ms ease,
+    color 200ms ease,
+    background-color 220ms ease;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .finance-press:where(:hover, :focus-visible, :focus-within) {
+    transform: translate3d(0, -2px, 0);
+  }
+}
+
+.finance-press:where(:hover, :focus-visible, :focus-within) {
+  border-color: color-mix(in oklab, var(--color-finance-accent), transparent 35%);
+  box-shadow:
+    0 0 2.5rem -0.75rem color-mix(in oklab, var(--color-finance-accent), transparent calc(100% - 45% - var(--finance-open) * 25%)),
+    var(--finance-cast);
+}
+
+.finance :where(a, button, summary, input, textarea, select, [tabindex]):focus-visible {
+  outline: 2px solid var(--color-finance-accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ---------------------------------------------------------------------------
+ * The "resolve" reveal — content arrives in focus, never by fading.
+ * ------------------------------------------------------------------------- */
+@keyframes finance-resolve-in {
+  from {
+    filter: blur(var(--finance-blur-far)) saturate(var(--finance-sat-far));
+    transform: translate3d(0, var(--finance-lift-far), 0) scale(var(--finance-scale-far));
+  }
+  to {
+    filter: blur(0) saturate(1);
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  @supports (animation-timeline: view()) {
+    .finance-resolve-in {
+      --finance-plane: 1;
+      --finance-blur-far: calc((3 - var(--finance-plane)) * 2.5px * var(--finance-open));
+      --finance-lift-far: calc((1 + var(--finance-plane)) * 1.15rem);
+      --finance-scale-far: calc(1 + (var(--finance-open) * 2 - 1) * (3 - var(--finance-plane)) * 0.018);
+      animation-timing-function: linear;
+      animation-fill-mode: both;
+      animation-name: finance-resolve-in;
+      animation-timeline: view();
+      animation-range: cover calc(2% + var(--finance-i, 0) * 2%) cover calc(30% + var(--finance-i, 0) * 4%);
+    }
+
+    .finance-plane-far {
+      --finance-plane: 0;
+    }
+    .finance-plane-mid {
+      --finance-plane: 1;
+    }
+    .finance-plane-near {
+      --finance-plane: 2;
+    }
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ * The ring's animated custom property — must be @property to transition.
+ * ------------------------------------------------------------------------- */
+@property --finance-ring {
+  syntax: "<percentage>";
+  inherits: true;
+  initial-value: 0%;
+}
+
+/* ---------------------------------------------------------------------------
+ * The head.
+ * ------------------------------------------------------------------------- */
+.finance-team-rule {
+  display: block;
+  height: 1px;
+  background-color: var(--finance-hair);
+}
+
+.finance-team-headline {
+  padding-top: clamp(1.25rem, 2.6vw, 2.4rem);
+}
+
+/* ---------------------------------------------------------------------------
+ * The frame — head, ring and readout capped and centred together.
+ * ------------------------------------------------------------------------- */
+.finance-team-frame {
+  max-width: min(100%, calc(96svh * var(--finance-orbit-aspect)));
+  margin-inline: auto;
+}
+
+.finance-team-frame[data-compact] {
+  max-width: min(100%, calc(72svh * var(--finance-orbit-aspect)));
+}
+
+.finance-team-stage {
+  display: grid;
+  gap: clamp(2.5rem, 5vw, 4rem);
+  margin-top: clamp(2.5rem, 4.5vw, 4rem);
+  --finance-dwell: 6s;
+}
+
+@media (min-width: 64rem) {
+  .finance-team-stage:not([data-compact]) {
+    gap: 0;
+  }
+  .finance-team-stage:not([data-compact]) > * {
+    grid-area: 1 / 1;
+  }
+  .finance-team-stage:not([data-compact]) .finance-team-corner {
+    align-self: end;
+    justify-self: end;
+    width: 46%;
+    margin-right: 4%;
+    margin-bottom: 6%;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ * The plot and the ring.
+ * ------------------------------------------------------------------------- */
+.finance-team-plot {
+  position: relative;
+  container-type: inline-size;
+  overflow: clip;
+  width: 100%;
+  aspect-ratio: var(--finance-orbit-aspect);
+
+  --finance-edge: 5%;
+  mask-image:
+    linear-gradient(to right, transparent, #000 var(--finance-edge), #000 calc(100% - var(--finance-edge)), transparent),
+    linear-gradient(to bottom, transparent, #000 var(--finance-edge), #000 calc(100% - var(--finance-edge)), transparent);
+  mask-composite: intersect;
+  -webkit-mask-composite: source-in;
+
+  --finance-orbit-cx: calc(28.9cqw + var(--finance-orbit-r) * 0.7266 * 1cqw);
+  --finance-orbit-cy: calc(35.1% + var(--finance-orbit-r) * 0.687 * 1cqw);
+}
+
+@media (max-width: 47.99rem) {
+  .finance-team-plot {
+    aspect-ratio: 1.1;
+  }
+}
+
+.finance-team-ring {
+  position: absolute;
+  left: var(--finance-orbit-cx);
+  top: var(--finance-orbit-cy);
+  width: calc(var(--finance-orbit-r) * 2 * 1cqw);
+  aspect-ratio: 1;
+  margin-left: calc(var(--finance-orbit-r) * -1 * 1cqw);
+  margin-top: calc(var(--finance-orbit-r) * -1 * 1cqw);
+  border: 1px solid var(--finance-hair);
+  border-radius: 9999px;
+  pointer-events: none;
+}
+
+.finance-team-group {
+  position: absolute;
+  inset: 0;
+}
+
+/* One portrait on the ring. */
+.finance-team-node {
+  position: absolute;
+  left: var(--finance-orbit-cx);
+  top: var(--finance-orbit-cy);
+  width: calc(var(--finance-node-w) * 1cqw);
+  aspect-ratio: 1;
+  margin-left: calc(var(--finance-node-w) * -0.5 * 1cqw);
+  margin-top: calc(var(--finance-node-w) * -0.5 * 1cqw);
+  z-index: var(--finance-z, 1);
+  transition: transform 900ms cubic-bezier(0.65, 0, 0.35, 1);
+}
+
+.finance-team-node:hover,
+.finance-team-node:focus-within {
+  z-index: 40;
+}
+
+.finance-team-lens-button {
+  display: block;
+  position: relative;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+
+.finance-team-lens-button:focus-visible {
+  outline: none;
+}
+
+.finance-team-lens {
+  display: block;
+  position: relative;
+  --finance-ring-w: 1.5px;
+  scale: calc(1 - 0.06 * min(3, max(0, var(--finance-off) - 1)));
+  filter: blur(calc((1 - var(--finance-d)) * 4px * var(--finance-open)))
+    saturate(calc(1 + (1 - var(--finance-d)) * (var(--finance-open) * 2 - 1) * 0.4));
+  transition:
+    scale 900ms cubic-bezier(0.65, 0, 0.35, 1),
+    filter 900ms ease;
+}
+
+.finance-team-lens::before {
+  content: "";
+  position: absolute;
+  inset: -15%;
+  border-radius: 9999px;
+  border: var(--finance-ring-w) solid transparent;
+  pointer-events: none;
+  transition: border-color 160ms ease;
+}
+
+.finance-team-lens-button:focus-visible .finance-team-lens::before {
+  border-color: var(--color-finance-accent);
+}
+
+.finance-team-lens::after {
+  content: "";
+  position: absolute;
+  inset: -6%;
+  border-radius: 9999px;
+  pointer-events: none;
+  background: conic-gradient(from -90deg, var(--finance-ring-color, var(--color-finance-accent)) var(--finance-ring), transparent var(--finance-ring));
+  mask: radial-gradient(closest-side, transparent calc(100% - var(--finance-ring-w)), #000 calc(100% - var(--finance-ring-w)));
+  -webkit-mask: radial-gradient(closest-side, transparent calc(100% - var(--finance-ring-w)), #000 calc(100% - var(--finance-ring-w)));
+  transition: --finance-ring 560ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.finance-team-node:where(:hover, :focus-within):not([data-selected]) .finance-team-lens {
+  scale: calc((1 - 0.06 * min(3, max(0, var(--finance-off) - 1))) * 1.18);
+  filter: blur(0) saturate(1);
+}
+
+.finance-team-node[data-selected] .finance-team-lens {
+  scale: var(--finance-node-focal);
+  filter: none;
+  --finance-ring-w: calc(2px / var(--finance-node-focal));
+}
+
+.finance-team-node:where(:hover, :focus-within):not([data-selected]) .finance-team-lens::after {
+  --finance-ring: 100%;
+  --finance-ring-color: color-mix(in oklab, var(--color-finance-accent), transparent 45%);
+}
+
+.finance-team-node[data-selected] .finance-team-lens::after {
+  --finance-ring-color: var(--color-finance-accent);
+}
+
+.finance-team-stage:not([data-rotating]) .finance-team-node[data-selected] .finance-team-lens::after {
+  --finance-ring: 100%;
+}
+
+.finance-team-node[data-selected] .finance-team-portrait {
+  box-shadow: var(--finance-bloom), var(--finance-cast);
+}
+
+.finance-team-portrait {
+  position: relative;
+  overflow: hidden;
+  border-radius: 9999px;
+  aspect-ratio: 1;
+  background-color: var(--color-finance-surface);
+  transition: box-shadow 900ms ease;
+}
+
+.finance-team-portrait img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.finance-team-portrait-monogram {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  color: color-mix(in oklab, var(--color-finance-muted), transparent 40%);
+}
+
+.finance-team-portrait::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  pointer-events: none;
+  background-color: color-mix(in oklab, var(--color-finance-ground), transparent calc(100% - (1 - var(--finance-d)) * 42% * (1 - var(--finance-open))));
+  transition: background-color 900ms ease;
+}
+
+.finance-team-node[data-selected] .finance-team-portrait::after {
+  background-color: transparent;
+}
+
+.finance-team-caption {
+  position: absolute;
+  top: calc(100% + 0.7rem);
+  left: 50%;
+  translate: -50% 0;
+  width: max-content;
+  max-width: min(10rem, 32cqw);
+  padding: 0.25rem 0.7rem;
+  border: 1px solid var(--finance-hair);
+  border-radius: 9999px;
+  background-color: color-mix(in oklab, var(--color-finance-ground), transparent 10%);
+  color: var(--color-finance-ink);
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.3;
+  text-align: center;
+  text-wrap: balance;
+  opacity: 0;
+  filter: blur(3px);
+  pointer-events: none;
+  transition:
+    opacity 220ms ease,
+    filter 260ms ease;
+}
+
+.finance-team-node:where(:hover, :focus-within):not([data-selected]) .finance-team-caption {
+  opacity: 1;
+  filter: blur(0);
+}
+
+/* ---------------------------------------------------------------------------
+ * The readout.
+ * ------------------------------------------------------------------------- */
+.finance-team-corner {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(1.25rem, 2.6vw, 2.25rem);
+}
+
+.finance-team-readouts {
+  display: grid;
+  align-items: start;
+}
+
+.finance-team-readout {
+  grid-area: 1 / 1;
+  opacity: 0;
+  visibility: hidden;
+  scale: 0.985;
+  filter: blur(calc(3px * var(--finance-open)));
+  transition:
+    opacity 300ms ease,
+    filter 380ms ease,
+    scale 380ms cubic-bezier(0.22, 1, 0.36, 1),
+    visibility 0s linear 380ms;
+}
+
+.finance-team-readout[data-selected] {
+  opacity: 1;
+  visibility: visible;
+  scale: 1;
+  filter: none;
+  transition-delay: 0s;
+}
+
+.finance-team-readout-body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.finance-team-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.85rem 1.5rem;
+  width: 100%;
+  margin-bottom: clamp(0.9rem, 1.9vw, 1.6rem);
+}
+
+.finance-social-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.finance-social-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 9999px;
+  border: 1px solid color-mix(in oklab, var(--color-finance-line), transparent 50%);
+  color: var(--color-finance-muted);
+  text-decoration: none;
+}
+
+.finance-social-link:hover {
+  color: var(--color-finance-accent);
+}
+
+.finance-social-link svg {
+  width: 1rem;
+  height: 1rem;
+  fill: currentColor;
+}
+
+.finance-team-position {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin-left: 0.5rem;
+}
+
+.finance-team-position-rule {
+  display: block;
+  width: 2.25rem;
+  height: 1px;
+  background-color: var(--finance-hair);
+}
+
+.finance-team-trigger {
+  position: relative;
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+div.finance-team-trigger {
+  cursor: default;
+}
+
+.finance-team-role {
+  font-family: var(--font-finance-text, Figtree), ui-sans-serif, system-ui, sans-serif;
+  margin-bottom: 0.35rem;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  line-height: 1.55;
+  text-transform: uppercase;
+}
+
+.finance-team-name {
+  margin-top: 0.14em;
+  font-size: clamp(1.5rem, 2.6vw, 2.6rem);
+  line-height: 1.02;
+  letter-spacing: -0.02em;
+  transition: color 220ms ease;
+}
+
+.finance-team-suffix {
+  display: block;
+  margin-top: 0.5rem;
+  font-family: var(--font-finance-text, Figtree), ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  line-height: 1.55;
+  text-transform: uppercase;
+}
+
+.finance-team-underline {
+  display: block;
+  width: 0;
+  height: 1px;
+  margin-top: 1.1rem;
+  background-color: var(--color-finance-accent);
+  transition: width 420ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.finance-team-trigger:where(:hover, :focus-visible) .finance-team-name {
+  color: var(--color-finance-accent);
+}
+
+.finance-team-trigger:where(:hover, :focus-visible) .finance-team-underline {
+  width: 100%;
+}
+
+.finance-team-bio {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+  margin-top: clamp(0.9rem, 1.9vw, 1.6rem);
+  max-width: 52ch;
+  font-size: clamp(0.9375rem, 1vw, 1.0625rem);
+  line-height: 1.6;
+}
+
+.finance-team-steps {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.85rem;
+}
+
+.finance-team-step {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border: 0;
+  border-radius: 9999px;
+  background-color: var(--color-finance-accent);
+  color: var(--color-finance-on-accent);
+  cursor: pointer;
+  transition:
+    background-color 200ms ease,
+    box-shadow 240ms ease,
+    transform 240ms ease;
+}
+
+.finance-team-step:hover {
+  background-color: color-mix(in oklab, var(--color-finance-accent), var(--color-finance-ink) 16%);
+  box-shadow: 0 0 2rem -0.5rem color-mix(in oklab, var(--color-finance-accent), transparent calc(85% - var(--finance-open) * 35%));
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .finance-team-step:hover {
+    transform: translate3d(0, -2px, 0);
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ * Arrival — a portrait grows into a place the ring already marks.
+ * ------------------------------------------------------------------------- */
+@keyframes finance-team-arrive {
+  from {
+    transform: scale(0);
+  }
+  to {
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  @supports (animation-timeline: view()) {
+    .finance-team-plot {
+      view-timeline-name: --finance-orbit-view;
+      timeline-scope: --finance-orbit-view;
+    }
+
+    .finance-team-lens-button {
+      animation-name: finance-team-arrive;
+      animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+      animation-fill-mode: both;
+      animation-timeline: --finance-orbit-view;
+      animation-range: cover calc(5% + var(--finance-i, 0) * 2.5%) cover calc(32% + var(--finance-i, 0) * 2.5%);
+    }
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ * The dwell — the ring turns itself; the aperture ring is the countdown.
+ * ------------------------------------------------------------------------- */
+@keyframes finance-team-dwell {
+  from {
+    --finance-ring: 0%;
+  }
+  to {
+    --finance-ring: 100%;
+  }
+}
+
+.finance-team-stage[data-rotating] .finance-team-node[data-selected] .finance-team-lens {
+  animation: finance-team-dwell var(--finance-dwell) linear both;
+}
+
+.finance-team-stage[data-rotating] .finance-team-node[data-selected] .finance-team-lens::after {
+  background:
+    conic-gradient(from -90deg, var(--finance-ring-color, var(--color-finance-accent)) var(--finance-ring), transparent var(--finance-ring)),
+    color-mix(in oklab, var(--color-finance-accent), transparent 84%);
+  transition: none;
+}
+
+.finance-team-stage[data-rotating]:has(:focus-visible) .finance-team-node[data-selected] .finance-team-lens,
+.finance-team-stage[data-rotating]:not([data-onscreen]) .finance-team-node[data-selected] .finance-team-lens,
+body:has(dialog[open]) .finance-team-stage[data-rotating] .finance-team-node[data-selected] .finance-team-lens {
+  animation-play-state: paused;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .finance-team-stage[data-rotating] .finance-team-node[data-selected] .finance-team-lens {
+    animation: none;
+    --finance-ring: 100%;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ * The person dialog — native <dialog>, styled to match.
+ * ------------------------------------------------------------------------- */
+.finance-person-dialog {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  translate: -50% -50%;
+  margin: 0;
+  padding: 0;
+  max-height: 85svh;
+  width: calc(100% - 2rem);
+  max-width: 42rem;
+  overflow: hidden;
+  border: 0;
+  color: var(--color-finance-ink);
+  opacity: 0;
+  scale: 0.95;
+  transition:
+    opacity 200ms ease,
+    scale 200ms ease,
+    overlay 200ms allow-discrete,
+    display 200ms allow-discrete;
+}
+
+.finance-person-dialog[open] {
+  opacity: 1;
+  scale: 1;
+}
+
+@starting-style {
+  .finance-person-dialog[open] {
+    opacity: 0;
+    scale: 0.95;
+  }
+}
+
+.finance-person-dialog::backdrop {
+  background-color: color-mix(in oklab, var(--color-finance-ground), transparent 25%);
+  backdrop-filter: blur(8px);
+  opacity: 0;
+  transition:
+    opacity 200ms ease,
+    overlay 200ms allow-discrete,
+    display 200ms allow-discrete;
+}
+
+.finance-person-dialog[open]::backdrop {
+  opacity: 1;
+}
+
+@starting-style {
+  .finance-person-dialog[open]::backdrop {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .finance-person-dialog,
+  .finance-person-dialog::backdrop {
+    transition: none;
+  }
+}
+
+.finance-person-dialog-close {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  z-index: 10;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 9999px;
+  border: 1px solid color-mix(in oklab, var(--color-finance-line), transparent 50%);
+  background-color: color-mix(in oklab, var(--color-finance-ground), transparent 20%);
+  color: var(--color-finance-muted);
+  cursor: pointer;
+}
+
+.finance-person-dialog-close:hover {
+  color: var(--color-finance-accent);
+}
+
+.finance-person-dialog-body {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 1.5rem;
+  background-color: var(--color-finance-surface);
+}
+
+@media (min-width: 40rem) {
+  .finance-person-dialog-body {
+    padding: 2rem;
+  }
+}
+
+.finance-person-dialog-head {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+@media (min-width: 40rem) {
+  .finance-person-dialog-head {
+    flex-direction: row;
+    gap: 1.5rem;
+  }
+}
+
+.finance-person-dialog-portrait {
+  flex-shrink: 0;
+  width: 7rem;
+}
+
+@media (min-width: 40rem) {
+  .finance-person-dialog-portrait {
+    width: 9rem;
+  }
+}
+
+.finance-person-dialog-eyebrow {
+  margin-top: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-finance-accent);
+}
+
+.finance-person-dialog-title {
+  margin-top: 0.25rem;
+  font-size: 0.875rem;
+  color: var(--color-finance-muted);
+}
+
+.finance-person-dialog-bio {
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid color-mix(in oklab, var(--color-finance-line), transparent 60%);
+  font-size: 0.9375rem;
+  line-height: 1.6;
+  color: var(--color-finance-muted);
+}
+
+.finance-person-dialog-bio p + p {
+  margin-top: 0.9em;
+}
