@@ -216,3 +216,7 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Fridge Agent runtime state: local database and captured frames
+var/
+.env.local
