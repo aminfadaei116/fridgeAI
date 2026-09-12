@@ -220,3 +220,7 @@ __marimo__/
 # Fridge Agent runtime state: local database and captured frames
 var/
 .env.local
+
+# Cloudflare Worker toolchain
+node_modules/
+.wrangler/
