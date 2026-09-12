@@ -251,6 +251,30 @@ def daily_digest() -> dict:
     return get_pipeline().sentinel.digest().model_dump(mode="json")
 
 
+@app.get("/api/today")
+def todays_plan(refresh: bool = False) -> dict:
+    """Today's meal board.
+
+    Returns instantly. A valid cached plan comes back as `ready`; anything else starts a
+    background generation and returns `planning`, with `plan_ready` following on the event
+    stream. The dashboard must never block for the 30-60s a full board takes to build.
+    """
+    fridge = get_pipeline()
+
+    if not refresh:
+        cached = fridge.cached_plan()
+        if cached is not None:
+            return {"status": "ready", "plan": cached}
+
+    if not fridge.store.list_inventory():
+        return {"status": "empty", "plan": None}
+    if not fridge.ctx.llm.available:
+        return {"status": "offline", "plan": None}
+
+    started = fridge.plan_today_async()
+    return {"status": "planning", "plan": None, "already_running": not started}
+
+
 @app.post("/api/plan")
 def plan_meals(body: PlanBody) -> dict:
     """Structured cooking request - the form-shaped twin of asking in the chat."""

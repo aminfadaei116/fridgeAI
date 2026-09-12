@@ -23,6 +23,8 @@ const state = {
   recipeOpen: new Set(),
   recipes: [],
   nutrition: null,
+  planStatus: "idle",   // idle | planning | ready | empty | offline
+
   greeted: false,
   recording: false,
   recorder: null,
@@ -122,7 +124,6 @@ function renderAll(data) {
   renderStats();
   renderConfirm();
   renderItems();
-  renderRecipes();
   renderLedger();
   renderActivity(data.events || []);
 
@@ -350,18 +351,69 @@ async function resolvePending(id, confirmed) {
 function renderRecipes() {
   const host = $("recipes");
   host.replaceChildren();
-  const has = state.recipes.length > 0;
-  $("recipes-head").hidden = !has;
-  if (!has) return;
+  $("btn-replan").hidden = !state.recipes.length;
+
+  if (!state.recipes.length) {
+    $("recipes-count").textContent = "";
+    host.append(planPlaceholder());
+    return;
+  }
 
   const macros = new Map((state.nutrition?.estimates || []).map((e) => [e.recipe_title, e]));
-  $("recipes-count").textContent = state.nutrition?.day_total_calories
-    ? `${state.recipes.length} options · ~${state.nutrition.day_total_calories} kcal/day`
+  const total = state.nutrition?.day_total_calories;
+  $("recipes-count").textContent = total
+    ? `${state.recipes.length} options · ~${total} kcal a day`
     : `${state.recipes.length} options`;
 
+  // Grouped by meal so the board reads as a day, not a pile of dishes.
+  const order = ["breakfast", "lunch", "dinner", "snack"];
+  const byMeal = new Map();
   state.recipes.forEach((recipe, index) => {
-    host.append(recipeCard(recipe, index, macros.get(recipe.title)));
+    if (!byMeal.has(recipe.meal)) byMeal.set(recipe.meal, []);
+    byMeal.get(recipe.meal).push({ recipe, index });
   });
+
+  for (const meal of order) {
+    const group = byMeal.get(meal);
+    if (!group) continue;
+    const section = el("section", "meal-group");
+    section.append(el("p", "meal-label", meal));
+    for (const { recipe, index } of group) {
+      section.append(recipeCard(recipe, index, macros.get(recipe.title)));
+    }
+    host.append(section);
+  }
+}
+
+function planPlaceholder() {
+  const box = el("div", "planning");
+  const copy = {
+    planning: "Building today's menu around what spoils first…",
+    empty: "Nothing in the fridge to cook with yet.",
+    offline: "Today's menu needs a model connection.",
+    idle: "Working out today's menu…",
+  };
+  if (state.planStatus === "planning" || state.planStatus === "idle") box.append(el("i"));
+  box.append(el("span", null, copy[state.planStatus] || copy.idle));
+  return box;
+}
+
+/** Fetch today's board. Returns instantly; a background plan arrives over the event stream. */
+async function loadPlan(refresh = false) {
+  try {
+    const result = await apiJson(`/api/today${refresh ? "?refresh=true" : ""}`);
+    state.planStatus = result.status;
+    if (result.status === "ready" && result.plan) {
+      state.recipes = result.plan.recipes || [];
+      state.nutrition = result.plan.nutrition || null;
+      if (!state.recipeOpen.size) state.recipeOpen = new Set([0]);
+    } else {
+      state.recipes = [];
+    }
+    renderRecipes();
+  } catch (error) {
+    console.error("plan load failed", error);
+  }
 }
 
 function recipeCard(recipe, index, macro) {
@@ -586,6 +638,7 @@ function afterReply(reply) {
     state.recipes = reply.recipes;
     state.nutrition = reply.nutrition;
     state.recipeOpen = new Set([0]);   // land the demo on a filled card
+    state.planStatus = "ready";
     renderRecipes();
   }
   if (reply.profile_updated) toast("Saved that to your profile", "good");
@@ -752,6 +805,19 @@ function connectStream() {
         setDoor(false);
         refresh();
         break;
+      case "plan_started":
+        state.planStatus = "planning";
+        state.recipes = [];
+        renderRecipes();
+        break;
+      case "plan_ready":
+        loadPlan();
+        toast("Today's menu is ready", "good");
+        break;
+      case "plan_failed":
+        state.planStatus = "offline";
+        renderRecipes();
+        break;
       case "camera_status":
         state.camera = data;
         $("btn-camera").textContent = data.running ? "Stop camera" : "Start camera";
@@ -789,6 +855,13 @@ function wire() {
 
   $("btn-mic").addEventListener("click", toggleRecording);
 
+  $("btn-replan").addEventListener("click", () => {
+    state.planStatus = "planning";
+    state.recipes = [];
+    renderRecipes();
+    loadPlan(true);
+  });
+
   $("btn-camera").addEventListener("click", async () => {
     const running = state.camera.running;
     const result = await apiJson(`/api/camera/${running ? "stop" : "start"}`, { method: "POST" });
@@ -803,9 +876,11 @@ function wire() {
     await apiJson("/api/demo/seed", { method: "POST" });
     state.seenItemIds = null;
     state.recipes = [];
+    state.planStatus = "planning";
     renderRecipes();
     toast("Demo fridge reloaded", "good");
     refresh();
+    loadPlan();
   });
 
   $("btn-digest").addEventListener("click", async () => {
@@ -863,6 +938,7 @@ async function boot() {
     /* the roster is decoration */
   }
   await refresh();
+  await loadPlan();
   if (!state.modelAvailable) {
     toast("No model key set — the fridge runs, but the agents are offline.", "warn");
   }

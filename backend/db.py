@@ -3,6 +3,7 @@ web workers never fight over a handle."""
 
 from __future__ import annotations
 
+import hashlib
 import json
 import sqlite3
 from collections.abc import Iterator
@@ -84,6 +85,13 @@ CREATE TABLE IF NOT EXISTS messages (
     ts      TEXT NOT NULL,
     role    TEXT NOT NULL,
     content TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS daily_plan (
+    plan_date  TEXT PRIMARY KEY,
+    signature  TEXT NOT NULL,
+    payload    TEXT NOT NULL,
+    created_at TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS shelf_life_cache (
@@ -419,12 +427,59 @@ class Store:
             rows = conn.execute("SELECT name FROM shelf_life_cache ORDER BY name").fetchall()
         return [r["name"] for r in rows]
 
+    # --- daily plan ----------------------------------------------------------
+
+    def get_daily_plan(self, plan_date: str) -> dict | None:
+        with self.connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM daily_plan WHERE plan_date = ?", (plan_date,)
+            ).fetchone()
+        if not row:
+            return None
+        return {
+            "date": row["plan_date"],
+            "signature": row["signature"],
+            "created_at": row["created_at"],
+            **json.loads(row["payload"]),
+        }
+
+    def put_daily_plan(self, plan_date: str, signature: str, payload: dict) -> None:
+        with self.connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO daily_plan (plan_date, signature, payload, created_at)
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT(plan_date) DO UPDATE SET
+                    signature = excluded.signature,
+                    payload = excluded.payload,
+                    created_at = excluded.created_at
+                """,
+                (plan_date, signature, json.dumps(payload), datetime.now().isoformat()),
+            )
+
+    def inventory_signature(self) -> str:
+        """Fingerprint of what is on hand, so a plan can tell when the fridge moved under it.
+
+        Includes days remaining, not just names: yesterday's plan for a five-day spinach is
+        the wrong plan when that spinach is now due today.
+        """
+        parts = [f"{i.name}:{i.days_left}" for i in self.list_inventory()]
+        return hashlib.sha256("|".join(sorted(parts)).encode()).hexdigest()[:16]
+
     # --- maintenance ---------------------------------------------------------
 
     def reset(self) -> None:
         """Drops every row but keeps the shelf-life cache. Used by the demo seeder."""
         with self.connect() as conn:
-            for table in ("items", "events", "pending", "waste_ledger", "messages", "profile"):
+            for table in (
+                "items",
+                "events",
+                "pending",
+                "waste_ledger",
+                "messages",
+                "profile",
+                "daily_plan",
+            ):
                 conn.execute(f"DELETE FROM {table}")  # noqa: S608 - fixed table allowlist
 
 
