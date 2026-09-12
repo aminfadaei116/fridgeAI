@@ -6,7 +6,7 @@ from datetime import datetime
 from enum import StrEnum
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, computed_field
 
 
 class Category(StrEnum):
@@ -82,8 +82,11 @@ class InventoryItem(BaseModel):
         description="Camera frame captured when this item went in, served by /api/frames",
     )
 
+    @computed_field
     @property
     def days_left(self) -> int | None:
+        """Whole days until this spoils. Serialised, because every consumer needs it - the
+        dashboard, the toasts and the SSE payloads all read it off the dumped model."""
         if self.expires_at is None:
             return None
         return (self.expires_at.date() - datetime.now().date()).days

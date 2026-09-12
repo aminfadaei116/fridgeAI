@@ -134,3 +134,19 @@ def test__manually_added_item__has_no_frame(store):
 
     # Act / Assert: the UI must treat the photo as optional.
     assert store.find_present("milk").frame_ref is None
+
+
+def test__serialised_item__carries_days_left(store):
+    """days_left must survive model_dump, not just attribute access.
+
+    The SSE payloads and the dashboard toasts read it off the dumped model; as a plain
+    property it vanished and every toast read "no date".
+    """
+    # Arrange
+    store.add_item(detected("spinach"), shelf_life_days=5)
+
+    # Act
+    dumped = store.find_present("spinach").model_dump(mode="json")
+
+    # Assert
+    assert dumped["days_left"] == 5

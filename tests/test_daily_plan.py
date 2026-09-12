@@ -7,6 +7,8 @@ too lazy and the board on screen is built around food that has already been eate
 
 from __future__ import annotations
 
+import threading
+import time
 from datetime import date, timedelta
 
 from backend.pipeline import FridgePipeline
@@ -123,3 +125,58 @@ def test__reset__clears_the_stored_plan(ctx, store):
 
     # Assert: reseeding the demo must not leave the previous fridge's menu behind.
     assert store.get_daily_plan(date.today().isoformat()) is None
+
+
+def test__plan_today_async__does_not_start_a_second_plan_while_one_runs(ctx, store, monkeypatch):
+    """Two requests arriving together must produce one plan, not two.
+
+    The dashboard polls and the door cycle re-plans, so concurrent triggers are normal. A
+    full board is two model calls over the whole fridge; running it twice is real money and,
+    worse, two writes racing for the same cache row.
+    """
+    # Arrange
+    store.add_item(detected("spinach"), shelf_life_days=1, est_cost=4.49)
+    pipeline = build_pipeline(ctx)
+
+    started = threading.Event()
+    release = threading.Event()
+    runs = []
+
+    def slow_plan(options_per_meal: int = 2) -> dict:
+        runs.append(1)
+        started.set()
+        release.wait(timeout=5)
+        return {"recipes": [], "nutrition": {}}
+
+    monkeypatch.setattr(pipeline, "plan_today", slow_plan)
+
+    # Act: the first call takes the lock and blocks inside the plan.
+    assert pipeline.plan_today_async() is True
+    assert started.wait(timeout=5)
+    second = pipeline.plan_today_async()
+    release.set()
+
+    # Assert
+    assert second is False, "a second plan started while one was already running"
+    assert len(runs) == 1
+
+
+def test__planning_flag__clears_after_a_failed_plan(ctx, store, monkeypatch):
+    # Arrange: a chef that blows up.
+    store.add_item(detected("spinach"), shelf_life_days=1, est_cost=4.49)
+    pipeline = build_pipeline(ctx)
+
+    def explode(options_per_meal: int = 2) -> dict:
+        raise RuntimeError("chef is on fire")
+
+    monkeypatch.setattr(pipeline, "plan_today", explode)
+
+    # Act
+    pipeline.plan_today_async()
+    for _ in range(50):
+        if not pipeline.planning:
+            break
+        time.sleep(0.05)
+
+    # Assert: a failure must not wedge the lock and block every future plan.
+    assert pipeline.planning is False

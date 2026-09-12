@@ -225,7 +225,7 @@ backend/
   schemas.py     the contract every agent speaks
   llm.py         the only place that talks to OpenAI
   main.py        FastAPI; every route is a few lines
-frontend/        vanilla HTML/CSS/JS dashboard, no build step
+frontend/        savor dashboard - vanilla HTML/CSS/JS, three views, no build step
 docs/DESIGN.md   the visual spec the dashboard is built to
 data/            shelf-life seed table + the demo fixture
 docs/DEMO.md     the two-minute run sheet

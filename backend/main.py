@@ -87,11 +87,9 @@ def read_state() -> dict:
     inventory = store.list_inventory()
 
     return {
-        "inventory": [
-            {**item.model_dump(mode="json"), "days_left": item.days_left} for item in inventory
-        ],
+        "inventory": [item.model_dump(mode="json") for item in inventory],
         "expiring": [
-            {**item.model_dump(mode="json"), "days_left": item.days_left}
+            item.model_dump(mode="json")
             for item in store.expiring_within(settings.expiring_soon_days)
         ],
         "pending": [p.model_dump(mode="json") for p in store.list_pending()],
@@ -204,6 +202,7 @@ def add_item(body: ManualItemBody) -> dict:
     )
     item = fridge.curator.commit_add(detected)
     bus.publish("inventory_changed", {"added": [item.model_dump(mode="json")], "removed": []})
+    _replan_after_change(fridge)
     return item.model_dump(mode="json")
 
 
@@ -215,6 +214,7 @@ def remove_item(item_id: int, reason: str = "removed by hand") -> dict:
         raise HTTPException(status_code=404, detail="item not in the fridge")
     fridge.curator.commit_remove(match)
     bus.publish("inventory_changed", {"added": [], "removed": [match.model_dump(mode="json")]})
+    _replan_after_change(fridge)
     return {"removed": match.name, "reason": reason}
 
 
@@ -228,6 +228,7 @@ def discard_item(item_id: int) -> dict:
     fridge.store.mark_removed(match.id, ItemStatus.DISCARDED)
     fridge.store.record_ledger(match.name, "wasted", match.est_cost, "thrown out", match.id)
     bus.publish("inventory_changed", {"added": [], "removed": [match.model_dump(mode="json")]})
+    _replan_after_change(fridge)
     return {"discarded": match.name, "cost": match.est_cost}
 
 
@@ -377,6 +378,12 @@ def seed_demo() -> dict:
 
 
 # --- helpers and static -------------------------------------------------------
+
+
+def _replan_after_change(fridge: FridgePipeline) -> None:
+    """The menu is built around what spoils first, so any change to the fridge invalidates it."""
+    if fridge.ctx.llm.available:
+        fridge.plan_today_async()
 
 
 def _persist_upload(upload: UploadFile, label: str, suffix: str | None = None) -> Path:
