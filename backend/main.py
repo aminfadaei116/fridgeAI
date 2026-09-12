@@ -27,6 +27,9 @@ logger = logging.getLogger(__name__)
 
 FRONTEND_DIR = REPO_ROOT / "frontend"
 
+# Revalidate rather than reuse blindly; see RevalidatingStatic below.
+NO_CACHE = {"Cache-Control": "no-cache"}
+
 pipeline: FridgePipeline | None = None
 
 
@@ -74,6 +77,10 @@ class SpeakBody(BaseModel):
 
 class PlanBody(MealRequest):
     options_per_meal: int = 2
+
+
+class ProfileBody(BaseModel):
+    household_name: str
 
 
 # --- state --------------------------------------------------------------------
@@ -361,6 +368,14 @@ def list_agents() -> dict:
     return {"agents": [{"name": a.name, "role": a.role} for a in roster]}
 
 
+@app.post("/api/profile")
+def set_household_name(body: ProfileBody) -> dict:
+    """The name the dashboard greets you by. Blank clears it back to a neutral greeting."""
+    fridge = get_pipeline()
+    fridge.store.set_profile("household_name", body.household_name.strip()[:40])
+    return fridge.store.get_profile()
+
+
 # --- demo ---------------------------------------------------------------------
 
 
@@ -406,8 +421,24 @@ def _persist_clip(upload: UploadFile) -> Path:
 
 @app.get("/")
 def index() -> FileResponse:
-    return FileResponse(FRONTEND_DIR / "index.html")
+    return FileResponse(FRONTEND_DIR / "index.html", headers=NO_CACHE)
 
 
 if FRONTEND_DIR.exists():
-    app.mount("/static", StaticFiles(directory=FRONTEND_DIR), name="static")
+
+    class RevalidatingStatic(StaticFiles):
+        """StaticFiles that makes the browser check before reusing a file.
+
+        The dashboard has no build step, so nothing in its filenames changes when the code
+        does. Without this a browser happily pairs a fresh index.html with a cached app.js
+        from a previous version, and the page half-renders against elements that no longer
+        exist. `no-cache` still allows a 304, so this costs a conditional request, not a
+        download.
+        """
+
+        def file_response(self, *args, **kwargs) -> Response:
+            response = super().file_response(*args, **kwargs)
+            response.headers.update(NO_CACHE)
+            return response
+
+    app.mount("/static", RevalidatingStatic(directory=FRONTEND_DIR), name="static")

@@ -3,8 +3,8 @@
  * Three views over one state fetch, repainted live by a server-sent event stream.
  * No framework, no build step - the interesting part of this project is behind the API.
  *
- * Visual spec: docs/DESIGN.md. The rule that shapes the rendering is that urgency carries on
- * three channels - colour, shape and the day count in words - never colour alone.
+ * The rule that shapes the rendering is that urgency carries on three channels - colour,
+ * shape and the day count in words - never colour alone.
  */
 
 import { foodIcon } from "/static/food-icons.js";
@@ -14,6 +14,18 @@ const $ = (id) => document.getElementById(id);
 const CATEGORIES = [
   "all", "produce", "dairy", "meat", "seafood", "bakery",
   "pantry", "leftovers", "beverage", "condiment", "other",
+];
+
+const DAY_LETTERS = ["M", "T", "W", "T", "F", "S", "S"];
+
+/* Recipe cards get a colour block rather than a photo we do not have. Deterministic per
+   title, so a recipe keeps its colour between repaints. */
+const RECIPE_ART = [
+  "linear-gradient(135deg, #e9a05a, #c2553f)",
+  "linear-gradient(135deg, #e6b957, #c98a2e)",
+  "linear-gradient(135deg, #d4736e, #b8443d)",
+  "linear-gradient(135deg, #7fae6a, #46774a)",
+  "linear-gradient(135deg, #6fa8a0, #3c7a72)",
 ];
 
 const state = {
@@ -29,6 +41,7 @@ const state = {
   seenItemIds: null,     // null until the first paint, so nothing animates on load
   expanded: new Set(),
   recipeOpen: new Set([0]),
+  matchOpen: new Set(),
   recipes: [],
   nutrition: null,
   planStatus: "idle",
@@ -46,7 +59,7 @@ const state = {
 const money = (n) => `$${Number(n || 0).toFixed(2)}`;
 const clock = (iso) =>
   (iso ? new Date(iso) : new Date()).toLocaleTimeString([], {
-    hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false,
+    hour: "2-digit", minute: "2-digit", hour12: false,
   });
 
 function el(tag, className, text) {
@@ -63,9 +76,9 @@ function tierOf(days) {
   if (days === null || days === undefined) return { tier: "fine", word: "no date" };
   if (days < 0) return { tier: "crit", word: "Overdue" };
   if (days === 0) return { tier: "crit", word: "Today" };
-  if (days === 1) return { tier: "crit", word: "Tomorrow" };
-  if (days <= 3) return { tier: "warn", word: `${days} days` };
-  return { tier: "fine", word: `${days} days` };
+  if (days === 1) return { tier: "crit", word: "1 day left" };
+  if (days <= 3) return { tier: "warn", word: `${days} days left` };
+  return { tier: "fine", word: `${days} days left` };
 }
 
 const COUNTABLE_UNITS = new Set([
@@ -75,6 +88,7 @@ const COUNTABLE_UNITS = new Set([
 
 function quantityLabel(quantity, unit) {
   const amount = Number(quantity);
+  if (!unit) return `${amount % 1 === 0 ? amount : amount.toFixed(1)}`;
   const plural = amount !== 1 && COUNTABLE_UNITS.has(unit) ? `${unit}s` : unit;
   return `${amount % 1 === 0 ? amount : amount.toFixed(1)} ${plural}`;
 }
@@ -85,10 +99,30 @@ function handledNote(count) {
   return "not touched since intake";
 }
 
+const sentenceCase = (text) => (text ? text[0].toUpperCase() + text.slice(1) : text);
+
+const titleCase = (text) => text.replace(/\b[a-z]/g, (c) => c.toUpperCase());
+
 function listOf(names) {
   if (!names.length) return "";
   if (names.length === 1) return names[0];
   return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+}
+
+/** The name the dashboard greets you by. Blank is a perfectly good answer. */
+const who = () => (state.profile.household_name || "").trim();
+
+function greeting() {
+  const hour = new Date().getHours();
+  if (hour < 12) return "Good morning";
+  if (hour < 18) return "Good afternoon";
+  return "Good evening";
+}
+
+function artFor(title) {
+  let hash = 0;
+  for (const char of String(title)) hash = (hash * 31 + char.charCodeAt(0)) | 0;
+  return RECIPE_ART[Math.abs(hash) % RECIPE_ART.length];
 }
 
 function toast(message, tone = "info") {
@@ -131,52 +165,52 @@ function setView(view) {
   $("view-today").hidden = view !== "today";
   $("view-inventory").hidden = view !== "inventory";
   $("view-plan").hidden = view !== "plan";
+  $("btn-add-toggle").hidden = view !== "inventory";
   renderPageHead();
-  if (view === "inventory") renderInventoryGrid();
-  if (view === "plan") renderPlanGrid();
+  if (view === "inventory") renderInventoryRows();
+  if (view === "plan") renderPlanRows();
 }
 
 function renderPageHead() {
   const items = state.inventory;
   const spoilToday = items.filter((i) => (i.days_left ?? 99) <= 0);
-  const atRisk = spoilToday.reduce((sum, i) => sum + Number(i.est_cost || 0), 0);
+  const soon = items.filter((i) => (i.days_left ?? 99) <= 3);
+  const name = who();
 
   const copy = {
     today: {
-      eyebrow: "Seven agents, one fridge",
-      heading: !items.length
-        ? "Nothing in here yet"
-        : spoilToday.length === 0
-          ? "Nothing spoils today"
-          : `${spoilToday.length === 1 ? "One thing" : `${spoilToday.length} things`} spoil${spoilToday.length === 1 ? "s" : ""} today`,
-      sub: !items.length
-        ? "The camera wakes on the door switch. Put something in and it starts tracking."
-        : spoilToday.length
-          ? `${listOf(spoilToday.map((i) => i.name))} ${spoilToday.length === 1 ? "is" : "are"} out of time.`
-          : "Everything has a few days left. The menu still builds around whatever goes first.",
+      eyebrow: name ? `${greeting()}, ${name}` : greeting(),
+      heading: "Make the good stuff last longer.",
+      sub: spoilToday.length
+        ? sentenceCase(
+            `${listOf(spoilToday.map((i) => i.name))} ${spoilToday.length === 1 ? "is" : "are"} out of time.`
+          )
+        : items.length
+          ? "Your kitchen is calm and in sync."
+          : "Nothing tracked yet. Open the door with the camera running, or scan a clip.",
+      chip: new Date().toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" }),
     },
     inventory: {
-      eyebrow: "Everything tracked",
-      heading: "Inventory",
+      eyebrow: "Keep tabs, effortlessly",
+      heading: "Fridge inventory",
       sub:
-        (items.length === 0
-          ? "Nothing tracked yet. "
-          : items.length === 1
-            ? "One item, sorted by how long it has left. "
-            : `${items.length} items, sorted by how long they have left. `) +
-        "Colour, shape and words all carry the same urgency.",
+        items.length === 0
+          ? "Nothing in your kitchen yet."
+          : `${items.length === 1 ? "1 item" : `${items.length} items`} in your kitchen, sorted by what needs you first.`,
+      chip: `${money(spoilToday.reduce((sum, i) => sum + Number(i.est_cost || 0), 0))} at risk today`,
     },
     plan: {
       eyebrow: "Waste less, eat better",
       heading: "What should we make?",
-      sub: "Every one of these is built around what expires first, not what sounds nice.",
+      sub: "Ideas built around what you already have on hand.",
+      chip: soon.length ? `✦ ${soon.length} ${soon.length === 1 ? "item" : "items"} to use soon` : "✦ Nothing urgent",
     },
   }[state.view];
 
   $("eyebrow").textContent = copy.eyebrow;
   $("heading").textContent = copy.heading;
   $("subheading").textContent = copy.sub;
-  $("date-chip").textContent = `${money(atRisk)} at risk today`;
+  $("date-chip").textContent = copy.chip;
 }
 
 /* --- top-level paint ------------------------------------------------------- */
@@ -191,15 +225,17 @@ function renderAll(data) {
   state.modelAvailable = !!data.model_available;
   state.provider = data.provider || state.provider;
 
-  renderTopbar();
+  renderIdentity();
   renderPageHead();
-  renderStats();
+  renderHero();
+  renderMoney();
   renderConfirm();
   renderItems();
   renderLedger();
   renderActivity();
   renderHousehold();
-  if (state.view === "inventory") renderInventoryGrid();
+  renderWeek();
+  if (state.view === "inventory") renderInventoryRows();
 
   if (!state.greeted) {
     state.greeted = true;
@@ -209,45 +245,79 @@ function renderAll(data) {
   }
 }
 
-function renderTopbar() {
+function renderIdentity() {
+  const name = who();
+  $("who-name").textContent = name || "Your kitchen";
+  $("who-mark").textContent = name ? name.slice(0, 2) : "☺";
+  $("crumb-name").textContent = name ? `${name}'s kitchen` : "Your kitchen";
+  $("nav-count").textContent = String(state.inventory.length);
+  $("btn-camera").textContent = state.camera.running ? "Stop camera" : "Start camera";
+
   const lastScan = state.events.find((e) =>
     ["vision_diff", "added", "removed"].includes(e.kind)
   );
-  $("scan-line").textContent = state.doorOpen
-    ? "scanning now"
+  $("scan-cta-sub").textContent = state.doorOpen
+    ? "Scanning now…"
     : lastScan
-      ? `last scan ${clock(lastScan.ts)} · ${state.inventory.length} items`
-      : "no scans yet";
-  $("nav-count").textContent = String(state.inventory.length);
-  $("btn-camera").textContent = state.camera.running ? "Stop camera" : "Start camera";
+      ? `Last scan ${clock(lastScan.ts)}`
+      : "Update your inventory";
 }
 
-function renderStats() {
-  const spoilToday = state.inventory.filter((i) => (i.days_left ?? 99) <= 0).length;
-  const hasItems = state.inventory.length > 0;
+function renderHero() {
+  const soon = state.inventory.filter((i) => (i.days_left ?? 99) <= 1);
+  const items = state.inventory;
 
-  $("stat-today").textContent = hasItems ? String(spoilToday) : "0";
-  $("stat-today-cap").textContent = hasItems
-    ? `${spoilToday === 1 ? "item spoils" : "items spoil"} today`
-    : "items tracked";
+  if (!items.length) {
+    $("hero-eyebrow").textContent = "Start here";
+    $("hero-title").textContent = "Your fridge is a blank page.";
+    $("hero-body").textContent =
+      "Record a door cycle and savor will read what crossed the door, date it, and cook around it.";
+    $("btn-hero").textContent = "Scan the fridge";
+    return;
+  }
 
+  $("btn-hero").replaceChildren(
+    document.createTextNode(soon.length ? "See what to make " : "Plan today "),
+    el("span", null, "→")
+  );
+
+  if (!soon.length) {
+    $("hero-eyebrow").textContent = "All good";
+    $("hero-title").textContent = "Nothing is racing the clock.";
+    $("hero-body").textContent =
+      `${items.length} ${items.length === 1 ? "item" : "items"} tracked, and the soonest has a few days left. ` +
+      "The menu still builds around whatever goes first.";
+    return;
+  }
+
+  $("hero-eyebrow").textContent = "Eat this first";
+  $("hero-title").textContent =
+    `${soon.length} ${soon.length === 1 ? "ingredient is" : "ingredients are"} at their best right now.`;
+  const rest = soon.length - 1;
+  $("hero-body").textContent =
+    `${sentenceCase(soon[0].name)}${rest ? ` and ${rest} more` : ""} — ` +
+    `${tierOf(soon[0].days_left).word.toLowerCase()}. ` +
+    (state.recipes.length ? "We found a meal that uses them." : "Ask for a meal that uses them.");
+}
+
+function renderMoney() {
   const l = state.ledger;
   $("stat-saved").textContent = money(l.saved_cad);
-  $("stat-saved-cap").textContent = `saved in 7 days · ${l.items_saved || 0} items eaten in time`;
+  $("stat-saved-cap").textContent = `saved · ${l.items_saved || 0} eaten in time`;
   $("stat-wasted").textContent = money(l.wasted_cad);
-  $("stat-wasted-cap").textContent = `wasted in 7 days · ${l.items_wasted || 0} items binned`;
+  $("stat-wasted-cap").textContent = `wasted · ${l.items_wasted || 0} binned`;
 }
 
-/* --- items ----------------------------------------------------------------- */
+/* --- item rows ------------------------------------------------------------- */
 
-function itemCard(item, { isNew = false, compact = false } = {}) {
-  const { tier, word } = tierOf(item.days_left);
-  const card = el("article", "item");
-  card.dataset.tier = tier;
-  if (isNew) card.classList.add("is-arriving");
+function daysPill(tier, word) {
+  const pill = el("span", "days");
+  pill.dataset.tier = tier;
+  pill.append(shape(tier), document.createTextNode(word));
+  return pill;
+}
 
-  const row = el("div", "item-row");
-
+function iconFor(item) {
   const wrap = el("div", "icon-wrap");
   const tile = el("div", "icon-tile", foodIcon(item.name, item.category));
   const photo = el("span", "icon-photo");
@@ -257,45 +327,62 @@ function itemCard(item, { isNew = false, compact = false } = {}) {
     photo.title = "Intake photo from the fridge camera";
   }
   wrap.append(tile, photo);
-  row.append(wrap);
+  return wrap;
+}
 
-  const main = el("div", "item-main");
-  const title = el("div", "item-title");
-  title.append(el("span", "item-name", item.name));
-  if (!compact) title.append(el("span", "item-cat", item.category));
-  main.append(title);
-  main.append(
-    el("div", "item-meta",
-      `${quantityLabel(item.quantity, item.unit)} · ${money(item.est_cost)} · ` +
-      handledNote(item.removal_count))
-  );
-  row.append(main);
+/**
+ * One inventory line. `removable` adds the × (Inventory view); the Today shortlist leaves
+ * it off so the urgent list stays a list, not a control panel.
+ */
+function itemRow(item, { isNew = false, removable = false } = {}) {
+  const { tier, word } = tierOf(item.days_left);
+  const open = state.expanded.has(item.id);
 
-  const right = el("div", "item-right");
-  right.append(shape(tier));
-  right.append(el("span", "item-word", word));
+  const wrap = el("div", "row-wrap");
+  if (open) wrap.classList.add("is-open");
 
-  if (!compact) {
-    const open = state.expanded.has(item.id);
-    const caret = el("button", "caret", open ? "−" : "+");
-    caret.setAttribute("aria-expanded", String(open));
-    caret.setAttribute("aria-label", `Details for ${item.name}`);
-    caret.addEventListener("click", () => {
-      if (state.expanded.has(item.id)) state.expanded.delete(item.id);
-      else state.expanded.add(item.id);
-      renderItems();
-    });
-    right.append(caret);
+  const row = el("article", "row");
+  row.dataset.tier = tier;
+  if (isNew) row.classList.add("is-arriving");
+
+  const opener = el("button", "row-open");
+  opener.type = "button";
+  opener.setAttribute("aria-expanded", String(open));
+  opener.setAttribute("aria-label", `Details for ${item.name}`);
+  opener.append(iconFor(item));
+
+  const main = el("div", "row-main");
+  main.append(el("span", "row-name", item.name));
+  main.append(el("span", "row-sub", item.category));
+  opener.append(main);
+  opener.addEventListener("click", () => {
+    if (state.expanded.has(item.id)) state.expanded.delete(item.id);
+    else state.expanded.add(item.id);
+    renderItems();
+    if (state.view === "inventory") renderInventoryRows();
+  });
+  row.append(opener);
+
+  const right = el("div", "row-right");
+  right.append(el("span", "row-qty", quantityLabel(item.quantity, item.unit)));
+  right.append(daysPill(tier, word));
+
+  if (removable) {
+    const remove = el("button", "row-x", "×");
+    remove.type = "button";
+    remove.setAttribute("aria-label", `Remove ${item.name}`);
+    remove.addEventListener("click", () => removeItem(item));
+    right.append(remove);
   }
   row.append(right);
-  card.append(row);
+  wrap.append(row);
 
-  if (!compact && state.expanded.has(item.id)) card.append(itemDetail(item));
-  return card;
+  if (open) wrap.append(itemDetail(item));
+  return wrap;
 }
 
 function itemDetail(item) {
-  const detail = el("div", "item-detail");
+  const detail = el("div", "row-detail");
 
   const photo = el("div", "detail-photo");
   if (item.frame_ref) {
@@ -306,14 +393,25 @@ function itemDetail(item) {
   detail.append(photo);
 
   const body = el("div", "detail-body");
-  body.append(el("p", "detail-label", "shelf_life · storage tip"));
+  body.append(el("p", "detail-label", "shelf life · storage tip"));
   body.append(el("p", "detail-tip", item.storage_tip || "No storage note for this one."));
   const expires = item.expires_at ? item.expires_at.replace("T", " ").slice(0, 16) : "unknown";
   body.append(
-    el("p", "detail-dates", `expires ${expires} · shelf life ${item.shelf_life_days ?? "?"} days`)
+    el("p", "detail-dates",
+      `${money(item.est_cost)} · expires ${expires} · ${handledNote(item.removal_count)}`)
   );
   detail.append(body);
   return detail;
+}
+
+async function removeItem(item) {
+  try {
+    await api(`/api/items/${item.id}`, { method: "DELETE" });
+    toast(`${item.name} removed`, "info");
+    await refresh();
+  } catch (error) {
+    toast(`Could not remove that: ${error.message}`, "bad");
+  }
 }
 
 function renderItems() {
@@ -321,22 +419,17 @@ function renderItems() {
   host.replaceChildren();
 
   if (!state.inventory.length) {
-    $("items-count").textContent = "0 items";
     host.append(emptyBox());
     state.seenItemIds = new Set();
     return;
   }
 
-  $("items-count").textContent = state.doorOpen
-    ? `${state.inventory.length} items · just added at the top`
-    : `${state.inventory.length} items · sorted by days left`;
-
   const firstPaint = state.seenItemIds === null;
   const seen = state.seenItemIds || new Set();
 
-  // "Eat these next" is the urgent shortlist, not the whole fridge - that is the Inventory view.
-  for (const item of state.inventory.slice(0, 6)) {
-    host.append(itemCard(item, { isNew: !firstPaint && !seen.has(item.id) }));
+  // "Use these first" is the urgent shortlist, not the whole fridge - that is the Inventory view.
+  for (const item of state.inventory.slice(0, 5)) {
+    host.append(itemRow(item, { isNew: !firstPaint && !seen.has(item.id) }));
   }
   state.seenItemIds = new Set(state.inventory.map((i) => i.id));
 }
@@ -366,20 +459,20 @@ function renderCategoryChips() {
 
   for (const category of CATEGORIES) {
     if (category !== "all" && !present.has(category)) continue;
-    const chip = el("button", "pill", category);
+    const chip = el("button", "pill", titleCase(category));
     chip.type = "button";
     chip.dataset.on = String(state.category === category);
     chip.addEventListener("click", () => {
       state.category = category;
-      renderInventoryGrid();
+      renderInventoryRows();
     });
     host.append(chip);
   }
 }
 
-function renderInventoryGrid() {
+function renderInventoryRows() {
   renderCategoryChips();
-  const host = $("inventory-grid");
+  const host = $("inventory-rows");
   host.replaceChildren();
 
   const query = state.search.trim().toLowerCase();
@@ -394,11 +487,11 @@ function renderInventoryGrid() {
       el("p", "muted",
         state.inventory.length
           ? "Nothing matches that filter."
-          : "Nothing tracked yet. Open the door, or add something by hand.")
+          : "Nothing tracked yet. Scan a door cycle, or add something by hand.")
     );
     return;
   }
-  for (const item of filtered) host.append(itemCard(item, { compact: true }));
+  for (const item of filtered) host.append(itemRow(item, { removable: true }));
 }
 
 /* --- confirmation ---------------------------------------------------------- */
@@ -454,10 +547,18 @@ function macroMap() {
   return new Map((state.nutrition?.estimates || []).map((e) => [e.recipe_title, e]));
 }
 
+function fromFridge(recipe) {
+  return (recipe.ingredients || []).filter((i) => i.from_fridge);
+}
+
+function matchLabel(recipe) {
+  const have = fromFridge(recipe).length;
+  return `${have}/${have + (recipe.missing || []).length} matched`;
+}
+
 function recipeChips(recipe) {
   const chips = el("div", "chips");
-  for (const ing of recipe.ingredients || []) {
-    if (!ing.from_fridge) continue;
+  for (const ing of fromFridge(recipe)) {
     const chip = el("span", ing.expiring ? "chip chip-expiring" : "chip");
     if (ing.expiring) chip.append(shape("crit"));
     chip.append(document.createTextNode(`${ing.name}${ing.expiring ? " · expiring" : ""}`));
@@ -505,6 +606,34 @@ function recipeMeta(recipe, macro) {
   ].filter(Boolean).join(" · ");
 }
 
+function recipeDetail(recipe, macro) {
+  const detail = el("div", "recipe-detail");
+
+  const left = el("div");
+  left.append(el("p", "detail-label", "steps"));
+  left.append(stepList(recipe));
+  detail.append(left);
+
+  const right = el("div");
+  right.append(el("p", "detail-label", "nutrition · per serving"));
+  if (macro) {
+    right.append(macroGrid(macro));
+    if (!macro.fits_target && macro.adjustment) {
+      const note = el("div", "adjust");
+      note.append(shape("warn"));
+      note.append(el("span", null, macro.adjustment));
+      right.append(note);
+    }
+  } else {
+    right.append(el("p", "muted", "No estimate for this one."));
+  }
+  if ((recipe.missing || []).length) {
+    right.append(el("p", "recipe-missing", `Missing: ${recipe.missing.join(", ")}.`));
+  }
+  detail.append(right);
+  return detail;
+}
+
 /** Compact, collapsible card - used on the Today view. */
 function recipeRow(recipe, index, macro) {
   const open = state.recipeOpen.has(index);
@@ -528,47 +657,49 @@ function recipeRow(recipe, index, macro) {
   card.append(top);
   card.append(recipeChips(recipe));
 
-  if (open) {
-    const detail = el("div", "recipe-detail");
-    const left = el("div");
-    left.append(el("p", "detail-label", "steps"));
-    left.append(stepList(recipe));
-    detail.append(left);
-
-    const right = el("div");
-    right.append(el("p", "detail-label", "nutrition · per serving"));
-    if (macro) {
-      right.append(macroGrid(macro));
-      if (!macro.fits_target && macro.adjustment) {
-        const note = el("div", "adjust");
-        note.append(shape("warn"));
-        note.append(el("span", null, macro.adjustment));
-        right.append(note);
-      }
-    } else {
-      right.append(el("p", "muted", "No estimate for this one."));
-    }
-    if ((recipe.missing || []).length) {
-      right.append(el("p", "recipe-missing", `Missing: ${recipe.missing.join(", ")}.`));
-    }
-    detail.append(right);
-    card.append(detail);
-  }
+  if (open) card.append(recipeDetail(recipe, macro));
   return card;
 }
 
-/** Full card, always expanded - used on the Meal plan view. */
-function planCard(recipe, macro) {
-  const card = el("article", "plan-card");
-  card.append(el("div", "recipe-title", recipe.title));
-  card.append(el("div", "recipe-meta", recipeMeta(recipe, macro)));
-  if (recipe.why_this) card.append(el("div", "recipe-why", recipe.why_this));
-  card.append(recipeChips(recipe));
-  if (macro) card.append(macroGrid(macro));
-  card.append(el("p", "detail-label", "steps"));
-  card.append(stepList(recipe));
-  if ((recipe.missing || []).length) {
-    card.append(el("p", "recipe-missing", `Missing: ${recipe.missing.join(", ")}.`));
+/** Meal-plan row: colour block, title, match count, expandable recipe. */
+function matchRow(recipe, index, macro) {
+  const open = state.matchOpen.has(index);
+  const card = el("article", "match");
+
+  const top = el("div", "match-top");
+  const art = el("div", "match-art");
+  art.style.background = artFor(recipe.title);
+  art.append(el("i"));
+  top.append(art);
+
+  const main = el("div", "match-main");
+  main.append(el("div", "match-title", recipe.title));
+  if (recipe.why_this) main.append(el("div", "match-why", recipe.why_this));
+  top.append(main);
+
+  const side = el("div", "match-side");
+  side.append(el("span", "match-count", matchLabel(recipe)));
+  const toggle = el("button", "link-btn");
+  toggle.append(
+    document.createTextNode(open ? "Hide recipe " : "View recipe "),
+    el("span", null, open ? "↑" : "→")
+  );
+  toggle.setAttribute("aria-expanded", String(open));
+  toggle.addEventListener("click", () => {
+    if (state.matchOpen.has(index)) state.matchOpen.delete(index);
+    else state.matchOpen.add(index);
+    renderPlanRows();
+  });
+  side.append(toggle);
+  top.append(side);
+  card.append(top);
+
+  if (open) {
+    const detail = el("div", "match-detail");
+    detail.append(el("div", "recipe-meta", recipeMeta(recipe, macro)));
+    detail.append(recipeChips(recipe));
+    detail.append(recipeDetail(recipe, macro));
+    card.append(detail);
   }
   return card;
 }
@@ -593,6 +724,7 @@ function renderTodayMenu() {
 
   if (!state.recipes.length) {
     host.append(planPlaceholder());
+    renderTonight();
     return;
   }
   const macros = macroMap();
@@ -603,10 +735,33 @@ function renderTodayMenu() {
     seen.add(recipe.meal);
     host.append(recipeRow(recipe, index, macros.get(recipe.title)));
   });
+  renderTonight();
 }
 
-function renderPlanGrid() {
-  const host = $("plan-grid");
+/** The one idea worth acting on tonight: dinner if the chef planned one, else the first. */
+function renderTonight() {
+  const card = $("tonight-card");
+  const dinner = state.recipes.find((r) => r.meal === "dinner") || state.recipes[0];
+
+  if (!dinner) {
+    card.hidden = true;
+    return;
+  }
+  card.hidden = false;
+
+  const macro = macroMap().get(dinner.title);
+  $("tonight-art").style.background = artFor(dinner.title);
+  $("tonight-badge").textContent = `${matchLabel(dinner)} on hand`;
+  $("tonight-title").textContent = dinner.title;
+  $("tonight-why").textContent = dinner.why_this || "";
+  $("tonight-meta").textContent = [
+    `${dinner.minutes} min`,
+    macro ? `${macro.calories_per_serving} cal` : null,
+  ].filter(Boolean).join(" · ");
+}
+
+function renderPlanRows() {
+  const host = $("plan-rows");
   host.replaceChildren();
   if (!state.recipes.length) {
     host.append(planPlaceholder());
@@ -614,21 +769,40 @@ function renderPlanGrid() {
   }
   const macros = macroMap();
   const order = ["breakfast", "lunch", "dinner", "snack"];
-  const byMeal = new Map();
-  for (const recipe of state.recipes) {
-    if (!byMeal.has(recipe.meal)) byMeal.set(recipe.meal, []);
-    byMeal.get(recipe.meal).push(recipe);
-  }
-  for (const meal of order) {
-    for (const recipe of byMeal.get(meal) || []) {
-      host.append(planCard(recipe, macros.get(recipe.title)));
-    }
-  }
+  const ranked = [...state.recipes].sort(
+    (a, b) => order.indexOf(a.meal) - order.indexOf(b.meal)
+  );
+  ranked.forEach((recipe, index) => {
+    host.append(matchRow(recipe, index, macros.get(recipe.title)));
+  });
 }
 
-async function loadPlan(refresh = false) {
+function renderWeek() {
+  const host = $("week");
+  host.replaceChildren();
+
+  const today = new Date();
+  // Monday-first, matching the M T W T F S S strip.
+  const monday = new Date(today);
+  monday.setDate(today.getDate() - ((today.getDay() + 6) % 7));
+
+  for (let i = 0; i < 7; i += 1) {
+    const day = new Date(monday);
+    day.setDate(monday.getDate() + i);
+    const cell = el("div", "week-day");
+    cell.dataset.today = String(day.toDateString() === today.toDateString());
+    cell.append(el("span", "week-letter", DAY_LETTERS[i]));
+    cell.append(el("span", "week-num", String(day.getDate())));
+    host.append(cell);
+  }
+  $("week-note").textContent = state.recipes.length
+    ? `${state.recipes.length} ${state.recipes.length === 1 ? "idea" : "ideas"} planned for today.`
+    : "Nothing planned yet.";
+}
+
+async function loadPlan(refreshPlan = false) {
   try {
-    const result = await apiJson(`/api/today${refresh ? "?refresh=true" : ""}`);
+    const result = await apiJson(`/api/today${refreshPlan ? "?refresh=true" : ""}`);
     state.planStatus = result.status;
     if (result.status === "ready" && result.plan) {
       state.recipes = result.plan.recipes || [];
@@ -637,7 +811,9 @@ async function loadPlan(refresh = false) {
       state.recipes = [];
     }
     renderTodayMenu();
-    renderPlanGrid();
+    renderPlanRows();
+    renderWeek();
+    renderHero();
   } catch (error) {
     console.error("plan load failed", error);
   }
@@ -653,7 +829,7 @@ function renderLedger() {
     host.append(el("p", "muted", "Nothing logged yet. Entries appear once items leave the fridge."));
     return;
   }
-  for (const entry of entries) {
+  for (const entry of entries.slice(0, 6)) {
     const row = el("div", "ledger-row");
     row.append(el("span", "ledger-name", entry.item_name));
     row.append(el("span", "ledger-reason", entry.reason || entry.kind));
@@ -756,6 +932,7 @@ function thinking(text = "thinking…") {
 
 async function send(text) {
   if (!text.trim()) return;
+  setView("today");
   addBubble("user", text);
   $("chat-text").value = "";
   const pending = thinking();
@@ -776,8 +953,10 @@ function afterReply(reply) {
     state.nutrition = reply.nutrition;
     state.planStatus = "ready";
     state.recipeOpen = new Set([0]);
+    state.matchOpen = new Set();
     renderTodayMenu();
-    renderPlanGrid();
+    renderPlanRows();
+    renderWeek();
   }
   if (reply.profile_updated) toast("Saved that to your profile", "good");
   if (reply.reply && state.modelAvailable) speak(reply.reply);
@@ -908,6 +1087,7 @@ function setDoor(open, title, sub) {
   if (open) {
     $("scan-title").textContent = title || "Door open";
     $("scan-sub").textContent = sub || "Watching the door";
+    $("scan-cta-sub").textContent = "Scanning now…";
   }
 }
 
@@ -941,7 +1121,7 @@ function connectStream() {
         state.planStatus = "planning";
         state.recipes = [];
         renderTodayMenu();
-        renderPlanGrid();
+        renderPlanRows();
         break;
       case "plan_ready":
         loadPlan();
@@ -950,7 +1130,7 @@ function connectStream() {
       case "plan_failed":
         state.planStatus = "offline";
         renderTodayMenu();
-        renderPlanGrid();
+        renderPlanRows();
         break;
       case "camera_status":
         state.camera = data;
@@ -976,6 +1156,16 @@ async function refresh() {
   }
 }
 
+function pickClip() {
+  $("sim-input").click();
+}
+
+function showAddRow() {
+  setView("inventory");
+  $("add-form").hidden = false;
+  $("add-name").focus();
+}
+
 function wire() {
   $("nav").addEventListener("click", (e) => {
     const button = e.target.closest(".nav-btn");
@@ -996,7 +1186,7 @@ function wire() {
 
   $("search").addEventListener("input", (e) => {
     state.search = e.target.value;
-    renderInventoryGrid();
+    renderInventoryRows();
   });
 
   $("add-form").addEventListener("submit", async (e) => {
@@ -1007,8 +1197,7 @@ function wire() {
     try {
       const item = await postJson("/api/items", { name });
       $("add-name").value = "";
-      $("add-hint").textContent =
-        `${item.name} added · ${item.shelf_life_days} day shelf life`;
+      $("add-hint").textContent = `${item.name} added · ${item.shelf_life_days} day shelf life`;
       toast(`${item.name} added by hand`, "good");
       await refresh();
       loadPlan();
@@ -1017,15 +1206,38 @@ function wire() {
     }
   });
 
-  $("btn-replan").addEventListener("click", () => {
+  $("btn-add-toggle").addEventListener("click", showAddRow);
+  $("btn-quick-add").addEventListener("click", showAddRow);
+  $("btn-see-all").addEventListener("click", () => setView("inventory"));
+
+  for (const id of ["btn-scan", "btn-quick-scan", "btn-scan-inv"]) {
+    $(id).addEventListener("click", pickClip);
+  }
+
+  $("btn-hero").addEventListener("click", () => {
+    if (!state.inventory.length) return pickClip();
+    setView("plan");
+  });
+
+  $("btn-tonight").addEventListener("click", () => setView("plan"));
+  $("btn-quick-plan").addEventListener("click", () => setView("plan"));
+  $("btn-plan-tonight").addEventListener("click", () => {
     state.planStatus = "planning";
     state.recipes = [];
     renderTodayMenu();
-    renderPlanGrid();
+    renderPlanRows();
     loadPlan(true);
   });
 
-  $("btn-scan").addEventListener("click", () => $("sim-input").click());
+  for (const id of ["btn-replan", "btn-replan-2"]) {
+    $(id).addEventListener("click", () => {
+      state.planStatus = "planning";
+      state.recipes = [];
+      renderTodayMenu();
+      renderPlanRows();
+      loadPlan(true);
+    });
+  }
 
   $("btn-camera").addEventListener("click", async () => {
     const running = state.camera.running;
@@ -1043,13 +1255,14 @@ function wire() {
     state.recipes = [];
     state.planStatus = "planning";
     renderTodayMenu();
-    renderPlanGrid();
+    renderPlanRows();
     toast("Demo fridge reloaded", "good");
     await refresh();
     loadPlan();
   });
 
   $("btn-digest").addEventListener("click", async () => {
+    setView("today");
     const pending = thinking("writing the briefing…");
     try {
       const digest = await apiJson("/api/digest");
@@ -1062,6 +1275,30 @@ function wire() {
     } catch (error) {
       pending.remove();
       addBubble("assistant", `Could not write the briefing: ${error.message}`);
+    }
+  });
+
+  // Who this kitchen belongs to. Click the chip, type a name, and the greeting is yours.
+  $("btn-who").addEventListener("click", () => {
+    const form = $("who-form");
+    form.hidden = !form.hidden;
+    if (!form.hidden) {
+      $("who-input").value = who();
+      $("who-input").focus();
+    }
+  });
+
+  $("who-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    try {
+      state.profile = await postJson("/api/profile", {
+        household_name: $("who-input").value,
+      });
+      $("who-form").hidden = true;
+      renderIdentity();
+      renderPageHead();
+    } catch (error) {
+      toast(`Could not save that: ${error.message}`, "bad");
     }
   });
 

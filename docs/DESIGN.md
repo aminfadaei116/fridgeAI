@@ -1,21 +1,30 @@
 # savor · visual spec
 
 Implemented in `frontend/`. Source: the Claude Design "Savor Fridge Agent" prototype
-(2026-09-12). The prototype's internal templating runtime (`<sc-for>`, `{{ }}`, `DCLogic`) was
-deliberately not ported — it was read as markup plus data and rewritten against the live API.
+(2026-09-12), re-cut to a sidebar layout from a second round of design stills (2026-09-12).
+The prototype's internal templating runtime (`<sc-for>`, `{{ }}`, `DCLogic`) was deliberately
+not ported — it was read as markup plus data and rewritten against the live API.
 
 ## Shape of the app
 
-A sticky top bar over three views, switched client-side with no reload:
+A fixed left rail over three views, switched client-side with no reload. The rail carries the
+brand, the three destinations, the Fresh scan call to action, and who the kitchen belongs to.
 
 | View | What it is |
 |---|---|
-| **Today** | The stat band, the urgent shortlist, the menu, and a right rail: ledger, chat, activity, agents, household, controls |
-| **Inventory** | Everything tracked, searchable and filterable by category, plus add-by-hand and the urgency key |
-| **Meal plan** | The full board — every recipe expanded, grouped by meal |
+| **Today** | The hero (what to eat first), the urgent shortlist, the menu, and a right column: quick actions, tonight's idea, ledger, household, activity, agents |
+| **Inventory** | Everything tracked as rows, searchable and filterable by category, plus add-by-hand and the urgency key |
+| **Meal plan** | Best matches as expandable rows, a plan-tonight promo, and the week strip |
 
-The page head changes per view: a mono eyebrow, a large heading derived from live state
-(`2 things spoil today`), a subheading naming the items, and a money-at-risk chip.
+The page head is the greeting, not the alarm: a small-caps eyebrow (`GOOD AFTERNOON, AMIR`), a
+large Fraunces heading that stays put per view, a subheading derived from live state, and a
+date or at-risk chip. The urgent count moved into the Today hero, which is where the live
+number now lives (`3 ingredients are at their best right now.`).
+
+## Type
+
+Fraunces for display — headings, card titles, recipe names. Figtree for everything else. Both
+are already loaded for the team section, so the sidebar layout added no new font request.
 
 ## Palette
 
@@ -23,8 +32,8 @@ Warm cream paper, deep green accent. Cards float on the paper rather than sittin
 
 | Role | Value |
 |---|---|
-| Paper | `#f7f5ee` |
-| Top bar | `#f0f3eb` |
+| Paper | `#f4f2ea` · rail `#eeeee6` |
+| Hero / promo | deep green `#10513a` on white; green block `#e3f0e4` |
 | Card | `#fffcf7` · inner card `#ffffff` · wash `#f2f5ed` |
 | Ink | `#17342d` · secondary `#40584f` · muted `#779087` / `#8a9a92` |
 | Green | `#18714d` · dark `#0e4736` · mid `#3c6a56` |
@@ -60,10 +69,14 @@ crossing the door banner), `fade` (view change). All suppressed under
 
 ## Layout
 
-Fluid, not fixed: `repeat(auto-fit, minmax(min(100%, 340px), 1fr))` for the Today split,
-`auto-fill minmax(min(100%,320px),1fr)` for the inventory grid, `auto-fit minmax(min(100%,380px),1fr)`
-for the meal plan. One narrow breakpoint at 680px sends the nav full-width and stacks the item
-rows. No horizontal scroll at any width.
+A `224px` rail beside a `minmax(0,1.5fr) / minmax(0,1fr)` split. Three breakpoints: at 1080px
+the split collapses to one column, at 860px the rail becomes a horizontal bar above the page
+and its labels drop to icons, at 560px the quick-action tiles stack. No horizontal scroll at
+any width.
+
+Inventory and the Today shortlist share one row component. The only difference is the `×`,
+which Inventory gets and the shortlist does not — an urgent list should read as a list, not a
+control panel.
 
 ## Assets
 

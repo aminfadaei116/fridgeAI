@@ -25,10 +25,6 @@
       white-space: nowrap;
       border: 0;
     }
-    :root {
-      --font-finance-display: "Fraunces", ui-serif, Georgia, serif;
-      --font-finance-text: "Figtree", ui-sans-serif, system-ui, sans-serif;
-    }
 
     /* Re-theme the team section onto the site's own warm-neutral / green
        palette instead of its default violet, and frame it like the rest of
@@ -45,181 +41,299 @@
       --color-finance-ink: var(--ink);
       --color-finance-muted: var(--ink-3);
 
-      max-width: 1280px;
-      margin: 24px auto 0;
+      margin: 24px 0 0;
       border: 1px solid var(--line);
       border-radius: 22px;
       box-shadow: 0 22px 60px -30px oklch(0.4 0.02 85 / 0.4);
+      overflow: hidden;
     }
   </style>
 </head>
 <body>
 
-<header class="topbar">
-  <div class="brand">
-    <span class="brand-mark" aria-hidden="true">s</span>
-    <span class="brand-text">
-      <span class="brand-name">savor</span>
-      <span class="brand-scan" id="scan-line">no scans yet</span>
-    </span>
-  </div>
+<div class="shell">
 
-  <nav class="nav" id="nav" aria-label="Views">
-    <button class="nav-btn" data-view="today" aria-current="page">Today</button>
-    <button class="nav-btn" data-view="inventory">Inventory<span class="nav-badge" id="nav-count">0</span></button>
-    <button class="nav-btn" data-view="plan">Meal plan</button>
-  </nav>
-
-  <div class="topbar-right">
-    <div class="door-pill" id="door-pill" data-state="closed">
-      <span class="door-dot" aria-hidden="true"></span><span id="door-label">Closed</span>
-    </div>
-    <a class="btn-soft link-soft" href="#team">Team</a>
-    <button class="btn-soft" id="btn-scan">Fresh scan</button>
-  </div>
-</header>
-
-<section class="scan-banner" id="scan-banner" hidden aria-live="polite">
-  <span class="sweep" aria-hidden="true"></span>
-  <p class="scan-title" id="scan-title">Door open</p>
-  <p class="scan-sub" id="scan-sub">Watching the door</p>
-  <span class="scan-dots" aria-hidden="true"><i></i><i></i><i></i></span>
-</section>
-
-<main class="page">
-
-  <div class="page-head">
-    <div>
-      <p class="eyebrow mono" id="eyebrow">Seven agents, one fridge</p>
-      <h1 id="heading">Today</h1>
-      <p class="subheading" id="subheading"></p>
-    </div>
-    <p class="date-chip mono" id="date-chip">$0.00 at risk</p>
-  </div>
-
-  <!-- ---------------------------------------------------------------- TODAY -->
-  <section class="view" id="view-today">
-
-    <div class="stat-band">
-      <div class="stat">
-        <p class="stat-num" id="stat-today">0</p>
-        <p class="stat-cap" id="stat-today-cap">items tracked</p>
-      </div>
-      <div class="stat">
-        <p class="stat-num is-saved" id="stat-saved">$0.00</p>
-        <p class="stat-cap" id="stat-saved-cap">saved in 7 days</p>
-      </div>
-      <div class="stat">
-        <p class="stat-num is-wasted" id="stat-wasted">$0.00</p>
-        <p class="stat-cap" id="stat-wasted-cap">wasted in 7 days</p>
-      </div>
+  <!-- ----------------------------------------------------------------- RAIL -->
+  <aside class="rail">
+    <div class="rail-brand">
+      <span class="brand-mark" aria-hidden="true">s</span>
+      <span class="brand-text">
+        <span class="brand-name">savor</span>
+        <span class="brand-tag">Your kitchen, in sync.</span>
+      </span>
     </div>
 
-    <div class="split">
-      <div class="col">
+    <nav class="rail-nav" id="nav" aria-label="Views">
+      <button class="nav-btn" data-view="today" aria-current="page">
+        <span class="nav-ico" aria-hidden="true">⌂</span>
+        <span class="nav-label">Today</span>
+      </button>
+      <button class="nav-btn" data-view="inventory">
+        <span class="nav-ico" aria-hidden="true">▤</span>
+        <span class="nav-label">Inventory</span>
+        <span class="nav-badge" id="nav-count">0</span>
+      </button>
+      <button class="nav-btn" data-view="plan">
+        <span class="nav-ico" aria-hidden="true">✦</span>
+        <span class="nav-label">Meal plan</span>
+      </button>
+    </nav>
+
+    <div class="rail-foot">
+      <button class="scan-cta" id="btn-scan">
+        <span class="scan-cta-ico" aria-hidden="true">⟳</span>
+        <span class="scan-cta-text">
+          <span class="scan-cta-title">Fresh scan</span>
+          <span class="scan-cta-sub" id="scan-cta-sub">Update your inventory</span>
+        </span>
+        <span class="scan-cta-arrow" aria-hidden="true">→</span>
+      </button>
+
+      <button class="who" id="btn-who" aria-label="Set the name this kitchen is greeted by">
+        <span class="who-mark" id="who-mark" aria-hidden="true">☺</span>
+        <span class="who-text">
+          <span class="who-name" id="who-name">Your kitchen</span>
+          <span class="who-sub">Home kitchen</span>
+        </span>
+        <span class="who-arrow" aria-hidden="true">›</span>
+      </button>
+
+      <form class="who-form" id="who-form" hidden>
+        <input id="who-input" type="text" maxlength="40" autocomplete="off" placeholder="Your name" />
+        <button class="btn-solid btn-sm" type="submit">Save</button>
+      </form>
+    </div>
+  </aside>
+
+  <!-- ----------------------------------------------------------------- MAIN -->
+  <div class="main">
+
+    <header class="topbar">
+      <p class="crumb"><span aria-hidden="true">⌂</span> <span id="crumb-name">Your kitchen</span></p>
+      <div class="topbar-right">
+        <div class="door-pill" id="door-pill" data-state="closed">
+          <span class="door-dot" aria-hidden="true"></span><span id="door-label">Closed</span>
+        </div>
+        <a class="icon-btn link-soft" href="#team" title="The team">☺</a>
+        <button class="icon-btn" id="btn-digest" title="Today's briefing">✦</button>
+      </div>
+    </header>
+
+    <section class="scan-banner" id="scan-banner" hidden aria-live="polite">
+      <span class="sweep" aria-hidden="true"></span>
+      <p class="scan-title" id="scan-title">Door open</p>
+      <p class="scan-sub" id="scan-sub">Watching the door</p>
+      <span class="scan-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+    </section>
+
+    <main class="page">
+
+      <div class="page-head">
+        <div class="page-head-text">
+          <p class="eyebrow" id="eyebrow">Good morning</p>
+          <h1 id="heading">Today</h1>
+          <p class="subheading" id="subheading"></p>
+        </div>
+        <div class="page-head-side">
+          <p class="date-chip" id="date-chip"></p>
+          <button class="btn-solid" id="btn-add-toggle" hidden>+ Add item</button>
+        </div>
+      </div>
+
+      <!-- -------------------------------------------------------------- TODAY -->
+      <section class="view" id="view-today">
         <div id="confirm-zone"></div>
 
-        <article class="card">
-          <div class="card-head">
-            <h2>Eat these next</h2>
-            <p class="mono card-count" id="items-count"></p>
-          </div>
-          <div id="items" class="stack"></div>
-        </article>
+        <div class="split">
+          <div class="col">
 
-        <article class="card" id="today-menu-card">
-          <div class="card-head">
-            <h2>Cooks with what spoils today</h2>
-            <button class="btn-outline" id="btn-replan">Re-plan</button>
-          </div>
-          <div id="today-menu" class="stack"></div>
-        </article>
-      </div>
+            <article class="hero" id="hero">
+              <span class="hero-orb hero-orb-a" aria-hidden="true"></span>
+              <span class="hero-orb hero-orb-b" aria-hidden="true"></span>
+              <p class="hero-eyebrow" id="hero-eyebrow">Eat this first</p>
+              <h2 class="hero-title" id="hero-title">Nothing needs you yet.</h2>
+              <p class="hero-body" id="hero-body"></p>
+              <button class="hero-btn" id="btn-hero">See what to make <span aria-hidden="true">→</span></button>
+            </article>
 
-      <div class="col">
-        <article class="card">
-          <p class="mono card-label">waste ledger · 7 days</p>
-          <div id="ledger"></div>
-        </article>
+            <article class="card">
+              <div class="card-head">
+                <h2>Use these first</h2>
+                <button class="link-btn" id="btn-see-all">See all</button>
+              </div>
+              <div id="items" class="rows"></div>
+            </article>
 
-        <article class="card">
-          <p class="mono card-label">ask the fridge</p>
-          <div class="chat-log" id="chat-log" aria-live="polite"></div>
-          <div class="chips" id="chat-chips">
-            <button class="pill" data-say="What's going off first?">What's going off first?</button>
-            <button class="pill" data-say="Four guests tonight, vegetarian. What can I make?">4 guests, vegetarian</button>
-            <button class="pill" data-say="How much have I wasted this week?">Waste report</button>
+            <article class="card" id="today-menu-card">
+              <div class="card-head">
+                <h2>Cooks with what spoils today</h2>
+                <button class="btn-outline" id="btn-replan">Re-plan</button>
+              </div>
+              <div id="today-menu" class="stack"></div>
+            </article>
+
+            <article class="card">
+              <div class="card-head">
+                <h2>Ask the fridge</h2>
+              </div>
+              <div class="chat-log" id="chat-log" aria-live="polite"></div>
+              <div class="chips" id="chat-chips">
+                <button class="pill" data-say="What's going off first?">What's going off first?</button>
+                <button class="pill" data-say="Four guests tonight, vegetarian. What can I make?">4 guests, vegetarian</button>
+                <button class="pill" data-say="How much have I wasted this week?">Waste report</button>
+              </div>
+              <form class="composer" id="composer">
+                <input id="chat-text" type="text" autocomplete="off" placeholder="Ask about what's inside…" />
+                <button type="button" class="mic" id="btn-mic" aria-label="Speak to the fridge">🎙</button>
+              </form>
+              <p class="hint" id="chat-hint"></p>
+            </article>
           </div>
-          <form class="composer" id="composer">
-            <input id="chat-text" type="text" autocomplete="off" placeholder="Ask about what's inside…" />
-            <button type="button" class="mic" id="btn-mic" aria-label="Speak to the fridge">🎙</button>
+
+          <div class="col">
+
+            <article class="card">
+              <div class="card-head"><h2>Quick actions</h2></div>
+              <div class="quick">
+                <button class="quick-tile" id="btn-quick-scan">
+                  <span class="quick-ico" aria-hidden="true">⟳</span>
+                  <span class="quick-label">Scan fridge</span>
+                </button>
+                <button class="quick-tile" id="btn-quick-add">
+                  <span class="quick-ico" aria-hidden="true">+</span>
+                  <span class="quick-label">Add item</span>
+                </button>
+                <button class="quick-tile" id="btn-quick-plan">
+                  <span class="quick-ico" aria-hidden="true">✦</span>
+                  <span class="quick-label">Plan a meal</span>
+                </button>
+              </div>
+              <div class="camera-line">
+                <button class="pill" id="btn-camera">Start camera</button>
+                <button class="pill" id="btn-seed">Reset demo fridge</button>
+                <input type="file" id="sim-input" accept="video/*" hidden />
+              </div>
+              <p class="hint" id="control-hint">Pick a clip of the door opening and closing.</p>
+            </article>
+
+            <article class="card card-flush" id="tonight-card">
+              <div class="tonight-art" id="tonight-art" aria-hidden="true">
+                <span class="tonight-plate"></span>
+                <span class="tonight-badge" id="tonight-badge"></span>
+              </div>
+              <div class="tonight-body">
+                <p class="card-label">Tonight's idea</p>
+                <h2 class="tonight-title" id="tonight-title">Working it out…</h2>
+                <p class="tonight-why" id="tonight-why"></p>
+                <div class="tonight-foot">
+                  <p class="tonight-meta" id="tonight-meta"></p>
+                  <button class="link-btn" id="btn-tonight">Make it <span aria-hidden="true">→</span></button>
+                </div>
+              </div>
+            </article>
+
+            <article class="card">
+              <div class="card-head"><h2>Waste ledger</h2><span class="card-count">7 days</span></div>
+              <div class="money-band">
+                <div class="money">
+                  <p class="money-num is-saved" id="stat-saved">$0.00</p>
+                  <p class="money-cap" id="stat-saved-cap">saved</p>
+                </div>
+                <div class="money">
+                  <p class="money-num is-wasted" id="stat-wasted">$0.00</p>
+                  <p class="money-cap" id="stat-wasted-cap">wasted</p>
+                </div>
+              </div>
+              <div id="ledger"></div>
+            </article>
+
+            <article class="card card-household" id="household-card">
+              <p class="card-label">Household</p>
+              <p class="household-line" id="household-line">Not set yet</p>
+              <p class="household-note" id="household-note">Tell the fridge your diet, allergies or how many you are and it applies to every plan.</p>
+            </article>
+
+            <article class="card">
+              <div class="card-head"><h2>Activity</h2></div>
+              <div id="activity"></div>
+            </article>
+
+            <article class="card">
+              <div class="card-head"><h2>Seven agents</h2></div>
+              <div id="roster"></div>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <!-- ---------------------------------------------------------- INVENTORY -->
+      <section class="view" id="view-inventory" hidden>
+        <article class="card">
+          <div class="search-row">
+            <label class="search-field">
+              <span class="search-ico" aria-hidden="true">⌕</span>
+              <input id="search" type="search" autocomplete="off" placeholder="Search your fridge" />
+            </label>
+            <button class="btn-outline btn-scan-inline" id="btn-scan-inv">⟳ Fresh scan</button>
+          </div>
+
+          <form class="add-row" id="add-form" hidden>
+            <input id="add-name" type="text" autocomplete="off" placeholder="What went in? e.g. bell pepper" />
+            <button class="btn-solid" type="submit">Add</button>
           </form>
-          <p class="hint mono" id="chat-hint"></p>
+          <p class="hint" id="add-hint"></p>
+
+          <div class="chips" id="cat-chips"></div>
+          <div class="rows" id="inventory-rows"></div>
         </article>
 
-        <article class="card">
-          <p class="mono card-label">activity</p>
-          <div id="activity"></div>
-        </article>
+        <div class="key">
+          <span class="card-label">Urgency key</span>
+          <span class="key-row"><i class="shape shape-crit" aria-hidden="true"></i>triangle · Today / Tomorrow</span>
+          <span class="key-row"><i class="shape shape-warn" aria-hidden="true"></i>diamond · 2–3 days</span>
+          <span class="key-row"><i class="shape shape-fine" aria-hidden="true"></i>circle · 4 days and up</span>
+        </div>
+      </section>
 
-        <article class="card">
-          <p class="mono card-label">seven agents</p>
-          <div id="roster"></div>
-        </article>
-
-        <article class="card card-household" id="household-card">
-          <p class="mono card-label">household</p>
-          <p class="household-line" id="household-line">Not set yet</p>
-          <p class="household-note" id="household-note">Tell the fridge your diet, allergies or how many you are and it applies to every plan.</p>
-        </article>
-
-        <article class="card">
-          <p class="mono card-label">controls</p>
-          <div class="chips">
-            <button class="pill" id="btn-camera">Start camera</button>
-            <label class="pill" for="sim-input">Simulate a door cycle</label>
-            <input type="file" id="sim-input" accept="video/*" hidden />
-            <button class="pill" id="btn-digest">Today's briefing</button>
-            <button class="pill" id="btn-seed">Reset demo fridge</button>
+      <!-- ----------------------------------------------------------- MEAL PLAN -->
+      <section class="view" id="view-plan" hidden>
+        <div class="split">
+          <div class="col">
+            <article class="card">
+              <div class="card-head">
+                <h2>Best matches</h2>
+                <button class="btn-outline" id="btn-replan-2">Re-plan</button>
+              </div>
+              <div class="stack" id="plan-rows"></div>
+            </article>
           </div>
-          <p class="hint mono" id="control-hint">Pick a clip of the door opening and closing.</p>
-        </article>
-      </div>
-    </div>
-  </section>
 
-  <!-- ------------------------------------------------------------ INVENTORY -->
-  <section class="view" id="view-inventory" hidden>
-    <form class="search-row" id="add-form">
-      <input id="search" type="search" autocomplete="off" placeholder="Search your fridge…" />
-      <input id="add-name" type="text" autocomplete="off" placeholder="Add an item…" />
-      <button class="btn-solid" type="submit">Add item</button>
-    </form>
-    <p class="hint mono" id="add-hint"></p>
+          <div class="col">
+            <article class="promo">
+              <span class="promo-mark" aria-hidden="true">✦</span>
+              <h2 class="promo-title">Food that gets used feels good.</h2>
+              <p class="promo-body">Make one flexible plan now and savor will keep the rest of the week easy.</p>
+              <button class="btn-solid" id="btn-plan-tonight">Plan tonight's meal</button>
+            </article>
 
-    <div class="chips" id="cat-chips"></div>
-    <div class="grid" id="inventory-grid"></div>
+            <article class="card">
+              <div class="card-head"><h2>This week</h2></div>
+              <div class="week" id="week"></div>
+              <p class="week-note" id="week-note"></p>
+            </article>
+          </div>
+        </div>
+      </section>
 
-    <div class="key">
-      <span class="mono card-label">urgency key</span>
-      <span class="key-row"><i class="shape shape-crit" aria-hidden="true"></i>triangle + solid rule · Today / Tomorrow</span>
-      <span class="key-row"><i class="shape shape-warn" aria-hidden="true"></i>diamond + dashed rule · 2–3 days</span>
-      <span class="key-row"><i class="shape shape-fine" aria-hidden="true"></i>circle + plain rule · 4 days and up</span>
-    </div>
-  </section>
+      <section class="finance finance-band" id="team">
+        <div class="finance-wrap">
+          <div id="finance-team-frame"></div>
+        </div>
+      </section>
 
-  <!-- ----------------------------------------------------------- MEAL PLAN -->
-  <section class="view" id="view-plan" hidden>
-    <div class="grid grid-wide" id="plan-grid"></div>
-  </section>
-
-</main>
-
-<section class="finance finance-band" id="team">
-  <div class="finance-wrap">
-    <div id="finance-team-frame"></div>
+    </main>
   </div>
-</section>
+</div>
 
 <div class="toasts" id="toasts" aria-live="polite"></div>
 
