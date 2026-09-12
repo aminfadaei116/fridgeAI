@@ -150,6 +150,42 @@ honest offline behaviour rather than inventing results.
 
 ---
 
+## Deploy
+
+Cloudflare Containers ships the whole app as one container behind one Worker — the same FastAPI
+process serves the API and the dashboard, so there is one origin and no CORS.
+
+```bash
+npm install
+npx wrangler secret put OPENAI_API_KEY      # or GEMINI_API_KEY, per Providers above
+npm run deploy                              # builds the image, deploys the Worker
+```
+
+**Why a Worker in front of a container, not the container alone.**
+[`worker/index.ts`](worker/index.ts) routes every request to a single Durable Object-backed
+instance (`FRIDGE.getByName("singleton")`), because [`FridgePipeline`](backend/pipeline.py) is
+a per-process singleton over SQLite and an in-memory event bus — a second instance would be a
+second, divergent fridge with its own inventory. `max_instances: 1` in
+[`wrangler.jsonc`](wrangler.jsonc) enforces the same constraint at the platform level.
+
+**The container sleeps, and SQLite sleeps with it.** The dashboard's own SSE connection keeps
+the container awake while a tab is open; ten idle minutes after the last request it stops, and
+its disk stops with it, which resets the fridge. Re-seed from the dashboard's demo button, or
+raise `sleepAfter` in `worker/index.ts` to hold state longer — it bills running time either way.
+
+**No camera in a datacenter.** The door watcher reports it could not open the camera and steps
+aside; the way in is the dashboard's **Simulate a door cycle** upload or manual add, both of
+which run the identical `process_cycle` the camera would have driven.
+
+**Secrets are handed to the container explicitly.** They are not otherwise visible to the
+container process, so the Worker reads them off `env` and forwards only the ones actually set —
+an empty string would fail `LLM_PROVIDER`'s `Literal["openai", "gemini"]` at startup, which is
+worse than leaving it unset. Bump `BUILD_REV` in the [`Dockerfile`](Dockerfile) (or pass
+`--build-arg BUILD_REV=...`) to force wrangler to roll the running container onto new secrets —
+a Worker redeploy alone reattaches to the instance already running rather than restarting it.
+
+---
+
 ## Design decisions worth defending
 
 **Urgency never rides on colour alone.** Running the palette validator on the obvious
@@ -233,6 +269,9 @@ frontend/        savor dashboard - vanilla HTML/CSS/JS, three views, no build st
 docs/DESIGN.md   the visual spec the dashboard is built to
 data/            shelf-life seed table + the demo fixture
 docs/DEMO.md     the two-minute run sheet
+worker/index.ts  Cloudflare Worker that fronts the container (see Deploy)
+Dockerfile       the container image wrangler builds and runs
+wrangler.jsonc   Worker + container config
 ```
 
 ## Honest limitations
