@@ -1,4 +1,4 @@
-"""The spine: one door cycle in, one committed inventory change out.
+"""The spine: one door-cycle clip in, one committed inventory change out.
 
 Everything the camera triggers flows through `process_cycle`. The web API calls the same
 function for simulated cycles, so the demo path and the real path are the same code.
@@ -22,7 +22,8 @@ from backend.agents import (
     VisionAgent,
 )
 from backend.agents.curator import CurationResult
-from backend.capture import DoorWatcher
+from backend.agents.vision import evidence_time
+from backend.capture import DoorWatcher, extract_still
 from backend.events import bus
 from backend.schemas import MealRequest, VisionDiff
 
@@ -52,22 +53,28 @@ class FridgePipeline:
 
     # --- the door cycle ------------------------------------------------------
 
-    def process_cycle(self, frame_before: Path, frame_after: Path) -> CurationResult:
-        """Two frames to a committed inventory change. Called from the camera thread."""
-        bus.publish(
-            "analyzing",
-            {"frame_before": frame_before.name, "frame_after": frame_after.name},
-        )
+    def process_cycle(self, clip: Path) -> CurationResult:
+        """One clip to a committed inventory change. Called from the camera thread."""
+        bus.publish("analyzing", {"clip": clip.name})
 
-        diff = self.vision.diff(frame_before, frame_after)
+        reading = self.vision.watch(clip)
+        diff = reading.diff
+
+        # Freeze the clip at the moment something crossed the door: that frame shows the item
+        # in a hand rather than buried behind whatever went in after it.
+        still = extract_still(clip, evidence_time(reading.crossings), self.ctx.settings)
+        still_name = still.name if still else None
+
+        # The event log keeps both artefacts: the clip that was watched, and the still shown
+        # in the dashboard beside the item.
         self.store.log_event(
             "vision_diff",
-            frame_before=frame_before.name,
-            frame_after=frame_after.name,
+            frame_before=clip.name,
+            frame_after=still_name,
             payload=diff.model_dump(mode="json"),
         )
 
-        result = self.curator.reconcile(diff, frame_ref=frame_after.name)
+        result = self.curator.reconcile(diff, frame_ref=still_name)
         self._publish_result(result, diff)
 
         # The board is built around what is about to spoil, so a change to the fridge

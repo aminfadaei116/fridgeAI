@@ -29,4 +29,4 @@ verify: lint test
 	$(VENV)/bin/ruff format --check .
 
 clean:
-	rm -rf var/fridge.db var/fridge.db-wal var/fridge.db-shm var/frames/*.jpg
+	rm -rf var/fridge.db var/fridge.db-wal var/fridge.db-shm var/frames/*.jpg var/clips/*.mp4

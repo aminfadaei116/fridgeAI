@@ -10,6 +10,8 @@ dependencies = [
     "pydantic>=2.9",
     "pydantic-settings>=2.6",
     "openai>=1.60,<4",
+    # Video input: Gemini's OpenAI-compatible surface takes text and images only.
+    "google-genai>=1.0",
     "python-multipart>=0.0.12",
     "opencv-python>=4.10",
     "numpy>=1.26",

@@ -13,7 +13,7 @@ Rehearse this four times. Record a backup video after the third run and keep it 
 - [ ] **Speak replies** toggle on, laptop volume up
 - [ ] Props on the table: a bell pepper, a yogurt tub, one thing in opaque packaging
 - [ ] Backup video open in a second tab
-- [ ] Phone photos of a before/after frame pair saved, in case the camera will not attach —
+- [ ] A phone clip of a door cycle saved, in case the camera will not attach —
       the **Simulate a door cycle** button runs the identical pipeline
 
 ## The run sheet
@@ -21,7 +21,7 @@ Rehearse this four times. Record a backup video after the third run and keep it 
 | Time | Beat | What you say |
 |---|---|---|
 | **0:00–0:15** | Dashboard on screen, fridge on the table. Point at the `$7.48` thrown out. | "Canadian households throw out about $1,300 of food a year. Not from carelessness — because nobody knows what's actually in the fridge." |
-| **0:15–0:40** | Open the door. Put the **bell pepper** in. Close it. Watch the door pill go amber → blue → the pepper lands on the board. | "There's no door sensor in here. A camera inside a closed fridge sees black, so brightness *is* the sensor. Two frames — door open, door closing — one question to the model: what changed?" |
+| **0:15–0:40** | Open the door. Put the **bell pepper** in. Close it. Watch the door pill go amber → blue → the pepper lands on the board. | "There's no door sensor in here. A camera inside a closed fridge sees black, so brightness *is* the sensor. It records the whole cycle and asks the model one question: what crossed the door, in or out?" |
 | **0:40–1:00** | Open, take the **yogurt** out, close. It leaves the inventory and the ledger ticks up. | "Out works the same way. And because it left before its date, that's seven dollars it counts as used rather than wasted." |
 | **1:00–1:15** | Open, put the **opaque item** in, close. The confirmation card appears. Press **Yes**. | "This is the part I actually care about. It's 61% sure, and its bar to write something in on its own is 80. So it asks instead of guessing." |
 | **1:15–1:35** | Press **Today's briefing**. It speaks. | *(let it talk — the mushroom line lands on its own)* |

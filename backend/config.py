@@ -65,6 +65,7 @@ class Settings(BaseSettings):
     # Storage
     db_path: Path = REPO_ROOT / "var" / "fridge.db"
     frame_dir: Path = REPO_ROOT / "var" / "frames"
+    clip_dir: Path = REPO_ROOT / "var" / "clips"
 
     # Door trigger. A camera inside a closed fridge sees black; brightness is the door sensor.
     camera_index: int = 0
@@ -72,6 +73,15 @@ class Settings(BaseSettings):
     door_close_brightness: float = 40.0
     settle_frames: int = 8
     poll_interval_seconds: float = 0.2
+
+    # Clip recording. The door cycle is recorded end to end and the whole clip goes to the
+    # model, so the crossing itself is observed rather than inferred from two shelf states.
+    clip_fps: float = 15.0  # fallback when the camera will not report its own frame rate
+    clip_max_seconds: float = 60.0  # a door left hanging open must not record forever
+
+    # Frames per second the model samples from the clip. Google's default of 1 fps misses a
+    # fast hand-through-the-door crossing; 2 fps catches them.
+    clip_sample_fps: float = 2.0
 
     # Reconciliation. Above `auto_commit_confidence` the agent writes; below it, it asks.
     auto_commit_confidence: float = 0.8
@@ -99,6 +109,16 @@ class Settings(BaseSettings):
         return bool(self.api_key)
 
     @property
+    def supports_video_input(self) -> bool:
+        """Whether the provider can be sent a video clip rather than a pair of stills.
+
+        Only Gemini, and only through its native SDK - the OpenAI-compatible surface this app
+        otherwise uses takes text and images only. Everywhere else the vision agent falls back
+        to comparing two frames pulled out of the same clip.
+        """
+        return self.llm_provider == "gemini" and not self.base_url_override.strip()
+
+    @property
     def supports_audio_endpoints(self) -> bool:
         """Whether the provider serves /audio/transcriptions and /audio/speech.
 
@@ -120,4 +140,5 @@ def get_settings() -> Settings:
     settings = Settings()
     settings.db_path.parent.mkdir(parents=True, exist_ok=True)
     settings.frame_dir.mkdir(parents=True, exist_ok=True)
+    settings.clip_dir.mkdir(parents=True, exist_ok=True)
     return settings

@@ -35,7 +35,7 @@
 <section class="scan-banner" id="scan-banner" hidden aria-live="polite">
   <span class="sweep" aria-hidden="true"></span>
   <p class="scan-title" id="scan-title">Door open</p>
-  <p class="scan-sub" id="scan-sub">Comparing frames</p>
+  <p class="scan-sub" id="scan-sub">Watching the door</p>
   <span class="scan-dots" aria-hidden="true"><i></i><i></i><i></i></span>
 </section>
 
@@ -131,11 +131,11 @@
           <div class="chips">
             <button class="pill" id="btn-camera">Start camera</button>
             <label class="pill" for="sim-input">Simulate a door cycle</label>
-            <input type="file" id="sim-input" accept="image/*" multiple hidden />
+            <input type="file" id="sim-input" accept="video/*" hidden />
             <button class="pill" id="btn-digest">Today's briefing</button>
             <button class="pill" id="btn-seed">Reset demo fridge</button>
           </div>
-          <p class="hint mono" id="control-hint">Pick two photos: before, then after.</p>
+          <p class="hint mono" id="control-hint">Pick a clip of the door opening and closing.</p>
         </article>
       </div>
     </div>

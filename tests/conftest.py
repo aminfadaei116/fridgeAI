@@ -51,6 +51,7 @@ def settings(tmp_path) -> Settings:
         offline_mode=True,
         db_path=tmp_path / "test.db",
         frame_dir=tmp_path / "frames",
+        clip_dir=tmp_path / "clips",
         auto_commit_confidence=0.8,
         reject_confidence=0.25,
     )

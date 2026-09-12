@@ -3,9 +3,9 @@
 ## One door cycle, end to end
 
 ```
-  ┌────────────┐   brightness      ┌──────────────┐   frame pair
-  │  webcam    │──── crosses ─────▶│ DoorWatcher  │──── (A, B) ────┐
-  │ in fridge  │    threshold      │  (thread)    │                │
+  ┌────────────┐   brightness      ┌──────────────┐   one clip of
+  │  webcam    │──── crosses ─────▶│ DoorWatcher  │── the whole ───┐
+  │ in fridge  │    threshold      │  (thread)    │   door cycle   │
   └────────────┘                   └──────────────┘                ▼
                                                         ┌────────────────────┐
                                                         │  FridgePipeline    │
@@ -16,7 +16,7 @@
                                     ▼                             ▼
                             ┌───────────────┐            ┌─────────────────┐
                             │ VisionAgent   │            │   EventBus      │
-                            │ gpt-4o, 1 call│            │  → SSE → UI     │
+                            │ video, 1 call │            │  → SSE → UI     │
                             └───────┬───────┘            └─────────────────┘
                                     │ VisionDiff
                                     ▼

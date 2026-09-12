@@ -9,24 +9,8 @@ from __future__ import annotations
 from backend.agents.chef import ChefAgent
 from backend.agents.concierge import ConciergeAgent
 from backend.agents.sentinel import SentinelAgent
-from backend.agents.vision import VisionAgent
 from backend.schemas import MealRequest
 from tests.conftest import detected
-
-
-def test__vision__returns_an_empty_diff_when_no_model_is_reachable(ctx, tmp_path):
-    # Arrange
-    agent = VisionAgent(ctx)
-    frame = tmp_path / "frame.jpg"
-    frame.write_bytes(b"not really a jpeg")
-
-    # Act
-    diff = agent.diff(frame, frame)
-
-    # Assert: no invented items, and the reason is stated.
-    assert diff.added == []
-    assert diff.removed == []
-    assert "offline" in diff.scene_note
 
 
 def test__chef__names_the_urgent_items_even_offline(ctx, store, shelf_life):

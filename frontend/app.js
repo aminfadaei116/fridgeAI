@@ -347,8 +347,8 @@ function emptyBox() {
   box.append(el("h3", null, "Nothing tracked yet"));
   box.append(
     el("p", null,
-      "Open the door and put something in. The camera wakes on the door switch, compares " +
-      "the before and after frame, and logs what changed.")
+      "Open the door and put something in. The camera wakes on the door switch, records " +
+      "the cycle, and logs what crossed the door.")
   );
   const l = state.ledger;
   box.append(
@@ -424,7 +424,7 @@ function renderConfirm() {
     body.append(
       el("p", "confirm-meta",
         `${Math.round(pending.item.confidence * 100)}% confidence · ` +
-        `frame captured ${clock(pending.created_at)} · ` +
+        `seen ${clock(pending.created_at)} · ` +
         `${pending.item.category}, ${quantityLabel(pending.item.quantity, pending.item.unit)}`)
     );
 
@@ -907,7 +907,7 @@ function setDoor(open, title, sub) {
   banner.hidden = !open;
   if (open) {
     $("scan-title").textContent = title || "Door open";
-    $("scan-sub").textContent = sub || "Comparing frames";
+    $("scan-sub").textContent = sub || "Watching the door";
   }
 }
 
@@ -920,10 +920,10 @@ function connectStream() {
 
     switch (event.kind) {
       case "door_opened":
-        setDoor(true, "Door open", "Watching the shelf");
+        setDoor(true, "Door open", "Recording the door cycle");
         break;
       case "analyzing":
-        setDoor(true, "Door closed", "Comparing frames — vision agent");
+        setDoor(true, "Door closed", "Watching the clip — vision agent");
         break;
       case "inventory_changed":
         setDoor(false);
@@ -1066,17 +1066,12 @@ function wire() {
   });
 
   $("sim-input").addEventListener("change", async (e) => {
-    const files = [...e.target.files];
-    if (files.length !== 2) {
-      toast("Pick exactly two images: the before frame, then the after frame.", "warn");
-      e.target.value = "";
-      return;
-    }
+    const [clip] = e.target.files;
+    if (!clip) return;
     const form = new FormData();
-    form.append("frame_before", files[0]);
-    form.append("frame_after", files[1]);
-    $("control-hint").textContent = "Comparing the two frames…";
-    setDoor(true, "Door closed", "Comparing frames — vision agent");
+    form.append("clip", clip);
+    $("control-hint").textContent = "Watching the clip…";
+    setDoor(true, "Door closed", "Watching the clip — vision agent");
     try {
       const result = await apiJson("/api/door/simulate", { method: "POST", body: form });
       const changes = (result.added?.length || 0) + (result.removed?.length || 0);
@@ -1084,7 +1079,7 @@ function wire() {
         ? `${changes} change${changes > 1 ? "s" : ""} committed.`
         : result.questions?.length
           ? "The fridge has a question."
-          : "No change detected between those frames.";
+          : "Nothing crossed the door in that clip.";
     } catch (error) {
       $("control-hint").textContent = `That failed: ${error.message}`;
     }

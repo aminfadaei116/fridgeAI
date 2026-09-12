@@ -10,7 +10,7 @@ the spinach that dies tomorrow.
 ```
 ┌─ the door opens ─────────────────────────────────────────────────────────────┐
 │                                                                              │
-│  camera  →  brightness trigger  →  frame pair (A, B)  →  vision agent        │
+│  camera  →  brightness trigger  →  door-cycle clip  →  vision agent          │
 │                                                              ↓               │
 │                                          "bell pepper in, yogurt out, 0.94"  │
 │                                                              ↓               │
@@ -37,10 +37,13 @@ the spinach that dies tomorrow.
 
 ## The two decisions that make this work
 
-**1. Two still frames, not video.** Tracking hands through a fridge door is a week of work and
-it fails live. Instead the system takes one frame just after the door opens and one just before
-it closes, and asks a vision model a single question: *what changed?* In-versus-out falls
-straight out of the comparison. One API call per door cycle, no tracking, no video pipeline.
+**1. Watch the crossing, don't diff the shelf.** The whole door cycle is recorded and sent to
+the model as one clip, and the question asked is *what crossed the door plane, in or out, and
+when?* Not *what do these two photographs disagree about?* Direction is observed rather than
+deduced, an item put in and taken straight back out cancels itself, and something hidden behind
+the juice carton is still seen crossing. Netting those crossings per item is deterministic code
+([`reduce_crossings`](backend/agents/vision.py)), not a second model call. Still one API call
+per door cycle, and still no hand tracking to write.
 
 **2. The door sensor is free.** A camera inside a closed fridge sees black. Mean frame
 brightness crossing a threshold **is** the door sensor — no wiring, no reed switch, no GPIO.
@@ -71,7 +74,7 @@ system parses prose.
 
 | Agent | Job | Contract |
 |---|---|---|
-| [`vision`](backend/agents/vision.py) | Compares the frame pair, reports what entered and left, with a confidence per item | `VisionDiff` |
+| [`vision`](backend/agents/vision.py) | Watches the door-cycle clip, reports every crossing of the door plane with a confidence each, nets them into what changed | `VisionDiff` |
 | [`curator`](backend/agents/curator.py) | Commits, asks, or ignores. Decides whether a departure was money used or money lost | `CurationResult` |
 | [`shelf_life`](backend/agents/shelf_life.py) | How long does this keep, what did it cost, how should it be stored | `ShelfLifeVerdict` |
 | [`chef`](backend/agents/chef.py) | Meals anchored on whatever is closest to spoiling, respecting diet and servings | `RecipeBoard` |
@@ -187,7 +190,7 @@ not an opening for an opinion.
 |---|---|---|
 | `GET` | `/api/state` | Everything the dashboard paints, in one call |
 | `GET` | `/api/stream` | Server-sent events — this is what makes the door cycle appear live |
-| `POST` | `/api/door/simulate` | Run the real pipeline on an uploaded frame pair |
+| `POST` | `/api/door/simulate` | Run the real pipeline on an uploaded door-cycle clip |
 | `POST` | `/api/camera/start` · `/stop` | Attach to the fridge camera |
 | `POST` | `/api/chat` | One conversational turn through the concierge |
 | `POST` | `/api/voice` | Speak to it: transcribe → route → reply |
@@ -204,12 +207,13 @@ not an opening for an opinion.
 ## Tests
 
 ```bash
-.venv/bin/python -m pytest      # 44 tests, ~1s, no API key and no network
+.venv/bin/python -m pytest      # 98 tests, ~2s, no API key and no network
 .venv/bin/ruff check . && .venv/bin/ruff format --check .
 ```
 
 The suite covers the deterministic core — the confidence gate, the used-versus-wasted rule,
-expiry arithmetic, FIFO matching, the brightness threshold — plus the model plumbing against a
+expiry arithmetic, FIFO matching, the brightness threshold, the crossing reducer — plus the
+model plumbing against a
 stub client, which proves that structured output binds to the right schema and that a
 tool-calling turn really dispatches and feeds results back. LLM *judgement* is not asserted on;
 what is asserted is that every agent degrades honestly when the model is unreachable.
@@ -219,11 +223,11 @@ what is asserted is that every agent degrades honestly when the model is unreach
 ```
 backend/
   agents/        the seven specialists, one file each
-  capture.py     brightness door trigger + frame pair
+  capture.py     brightness door trigger + clip recording
   pipeline.py    one door cycle in, one committed change out
   db.py          all SQL lives here, nowhere else
   schemas.py     the contract every agent speaks
-  llm.py         the only place that talks to OpenAI
+  llm.py         the only place that talks to a model provider
   main.py        FastAPI; every route is a few lines
 frontend/        savor dashboard - vanilla HTML/CSS/JS, three views, no build step
 docs/DESIGN.md   the visual spec the dashboard is built to

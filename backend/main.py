@@ -15,6 +15,7 @@ from fastapi.responses import FileResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
+from backend.capture import CLIP_SUFFIX
 from backend.config import REPO_ROOT, get_settings
 from backend.events import bus
 from backend.llm import LLMUnavailable
@@ -155,18 +156,14 @@ def camera_stop() -> dict:
 
 
 @app.post("/api/door/simulate")
-def simulate_door_cycle(
-    frame_before: UploadFile = File(...), frame_after: UploadFile = File(...)
-) -> dict:
-    """Run the real pipeline on an uploaded frame pair.
+def simulate_door_cycle(clip: UploadFile = File(...)) -> dict:
+    """Run the real pipeline on an uploaded door-cycle clip.
 
     Same code path as the camera - this exists so the system can be demonstrated and tested
     without a fridge on the table.
     """
     fridge = get_pipeline()
-    path_before = _persist_upload(frame_before, "sim-before")
-    path_after = _persist_upload(frame_after, "sim-after")
-    result = fridge.process_cycle(path_before, path_after)
+    result = fridge.process_cycle(_persist_clip(clip))
     return {
         "added": [i.model_dump(mode="json") for i in result.added],
         "removed": [i.model_dump(mode="json") for i in result.removed],
@@ -391,6 +388,17 @@ def _persist_upload(upload: UploadFile, label: str, suffix: str | None = None) -
     frame_dir = get_settings().frame_dir
     frame_dir.mkdir(parents=True, exist_ok=True)
     fd, name = tempfile.mkstemp(dir=frame_dir, prefix=f"{label}-", suffix=suffix)
+    with os.fdopen(fd, "wb") as handle:
+        shutil.copyfileobj(upload.file, handle)
+    return Path(name)
+
+
+def _persist_clip(upload: UploadFile) -> Path:
+    """Save an uploaded clip next to the recorded ones, so both take the same code path."""
+    suffix = Path(upload.filename or "").suffix or CLIP_SUFFIX
+    clip_dir = get_settings().clip_dir
+    clip_dir.mkdir(parents=True, exist_ok=True)
+    fd, name = tempfile.mkstemp(dir=clip_dir, prefix="sim-", suffix=suffix)
     with os.fdopen(fd, "wb") as handle:
         shutil.copyfileobj(upload.file, handle)
     return Path(name)
