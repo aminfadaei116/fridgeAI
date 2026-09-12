@@ -25,8 +25,13 @@
           <button class="nav-item" data-view="activity"><span>⌁</span> Activity</button>
         </nav>
         <div class="sidebar-bottom">
+          <button class="scan-card" data-action="open-upload" id="scanCard">
+            <span class="scan-orbit">⌁</span>
+            <span><strong>Fresh scan</strong><small>Upload a fridge video</small></span>
+            <i>→</i>
+          </button>
           <button class="experiment-card" data-view="activity" id="experimentCard">
-            <span class="experiment-orbit">⌁</span>
+            <span class="experiment-mark">▦</span>
             <span><strong>No experiment</strong><small>Run backend/pipeline.sh</small></span>
             <i>›</i>
           </button>
@@ -38,6 +43,7 @@
           <button class="mobile-brand" data-view="home" aria-label="Go home"><span class="brand-mark">s</span></button>
           <label class="location"><span class="home-icon">⌂</span><select id="experimentSelect" class="experiment-select" aria-label="Choose experiment"><option value="">No experiments yet</option></select><span class="chevron">⌄</span></label>
           <div class="top-actions">
+            <button class="round-button scan-button" data-action="open-upload" aria-label="Upload a video and scan" title="Fresh scan"><span class="scan-glyph">⌁</span><span id="scanDot"></span></button>
             <button class="round-button" data-action="reload" aria-label="Reload experiment data" title="Reload data">↻</button>
             <button class="round-button notification-button" data-action="show-alerts" aria-label="View expiry alerts">♧<span id="notificationDot"></span></button>
           </div>

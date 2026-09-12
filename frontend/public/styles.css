@@ -33,14 +33,18 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 .nav-item.is-active { color: var(--green-dark); background: white; box-shadow: 0 5px 18px rgba(31, 65, 48, .06); }
 .nav-item.is-active span { color: var(--green); }
 .sidebar-bottom { display: grid; gap: 18px; margin-top: auto; }
-.experiment-card { display: flex; align-items: center; gap: 10px; width: 100%; padding: 13px 11px; border: 0; border-radius: 15px; background: #dcefe2; text-align: left; transition: transform .2s, background .2s; }
-.experiment-card:hover { background: #d1e9d8; transform: translateY(-2px); }
-.experiment-card.is-active { background: #c9e4d2; }
-.experiment-orbit { display: grid; flex: 0 0 auto; width: 33px; height: 33px; place-items: center; color: white; background: var(--green); border-radius: 50%; font-size: 22px; line-height: 1; }
-.experiment-card strong { display: block; overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
-.experiment-card small { display: block; margin-top: 3px; color: #678276; font-size: 10px; }
-.experiment-card > span:nth-child(2) { min-width: 0; }
-.experiment-card i { margin-left: auto; font-size: 19px; font-style: normal; }
+.scan-card, .experiment-card { display: flex; align-items: center; gap: 10px; width: 100%; min-width: 0; max-width: 100%; padding: 13px 11px; border: 0; border-radius: 15px; text-align: left; transition: transform .2s, background .2s; }
+.scan-card { background: #dcefe2; }
+.scan-card:hover { background: #d1e9d8; transform: translateY(-2px); }
+.scan-card.is-busy .scan-orbit { animation: pulse 1.2s ease-in-out infinite; }
+.scan-orbit { display: grid; flex: 0 0 auto; width: 33px; height: 33px; place-items: center; color: white; background: var(--green); border-radius: 50%; font-size: 22px; line-height: 1; }
+.scan-card strong, .experiment-card strong { display: block; overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.scan-card small, .experiment-card small { display: block; margin-top: 3px; color: #678276; font-size: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.scan-card > span:nth-child(2), .experiment-card > span:nth-child(2) { min-width: 0; }
+.scan-card i, .experiment-card i { margin-left: auto; font-size: 19px; font-style: normal; }
+.experiment-card { padding: 9px 11px; background: transparent; }
+.experiment-card:hover, .experiment-card.is-active { background: #e6ebe3; }
+.experiment-mark { display: grid; flex: 0 0 auto; width: 33px; height: 33px; place-items: center; color: var(--green-dark); background: #dfe7de; border-radius: 50%; font-size: 15px; font-weight: 700; }
 
 .content { min-width: 0; }
 .topbar { display: flex; align-items: center; justify-content: space-between; max-width: 1280px; height: 90px; margin: auto; padding: 0 clamp(24px, 5vw, 72px); }
@@ -324,3 +328,38 @@ button.food-row:hover { background: #f3f6f0; }
 .mini-recipe-art.has-icons:after { display: none; }
 .refresh-note { color: var(--muted); font-size: 11px; }
 .from-other .ingredient-mark { color: #7a8c84; background: transparent; border: 1px dashed #c7d8cc; }
+
+/* ---------- upload / scan job ---------- */
+.scan-button .scan-glyph { font-size: 20px; }
+.scan-button span:last-child { position: absolute; top: 5px; right: 5px; width: 7px; height: 7px; background: var(--green); border: 1.5px solid #fff; border-radius: 50%; display: none; }
+.scan-button.is-busy span:last-child { display: block; animation: pulse 1.2s ease-in-out infinite; }
+.upload-form { display: grid; gap: 14px; }
+.field { display: grid; gap: 6px; }
+.field > span { color: #557067; font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+.field input[type="text"] { width: 100%; padding: 11px 13px; color: var(--ink); background: #fff; border: 1px solid var(--line); border-radius: 11px; font-size: 13px; }
+.field small { color: var(--muted); font-size: 11px; }
+.drop { display: grid; gap: 6px; justify-items: center; padding: 26px 16px; color: #557067; background: #fff; border: 1.5px dashed #c9ded0; border-radius: 14px; text-align: center; cursor: pointer; transition: background .15s, border-color .15s; }
+.drop:hover, .drop.is-over { background: var(--green-pale); border-color: var(--green); }
+.drop input { display: none; }
+.drop b { color: var(--ink); font-size: 13px; }
+.drop small { font-size: 11px; }
+.drop .picked { color: var(--green-dark); font-weight: 600; font-size: 12px; overflow-wrap: anywhere; }
+.form-error { margin: 0; padding: 10px 12px; color: #bf4b44; background: #fff0ed; border-radius: 10px; font-size: 12px; }
+.progress { height: 8px; overflow: hidden; background: #e6eae3; border-radius: 99px; }
+.progress b { display: block; height: 100%; background: var(--green); border-radius: 99px; transition: width .2s; }
+.job-head { display: grid; gap: 14px; justify-items: center; padding: 28px 24px 10px; text-align: center; }
+.job-head .state-orbit { margin: 0; }
+.job-head .state-orbit.is-done { background: var(--green); animation: none; }
+.job-head .state-orbit.is-failed { background: var(--red); animation: none; }
+.job-head h2 { margin: 0; font-family: "Fraunces", serif; font-size: 26px; letter-spacing: -.8px; }
+.job-head p { margin: 0; color: var(--muted); font-size: 12px; }
+.stage-list { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 6px 0 14px; }
+.stage { display: grid; gap: 4px; padding: 9px 6px; background: #f3f5ef; border-radius: 10px; text-align: center; font-size: 10px; font-weight: 700; color: #8a9a92; }
+.stage span { font-size: 15px; }
+.stage.is-active { color: var(--green-dark); background: var(--green-pale); }
+.stage.is-done { color: var(--green); background: var(--green-pale); }
+.stage.is-failed { color: #bf4b44; background: #fff0ed; }
+.job-log { max-height: 220px; overflow: auto; }
+.result-lists { display: grid; gap: 14px; }
+.result-lists h3 { margin: 0 0 6px; font-size: 13px; }
+.result-lists .food-list { gap: 0; }

@@ -194,7 +194,11 @@ class Jobs:
                 job = self.items[job_id]
                 job["status"] = "running"
                 job["started_at"] = now_iso()
-            cmd = ["bash", str(PIPELINE), str(job["_video_path"]), job["experiment"], "--quiet"]
+            # A bare name lands in backend/experiments/; when serving another folder, hand the pipeline
+            # the full path instead (it treats anything containing "/" as a path).
+            target = job["experiment"] if self.experiments_dir == DEFAULT_EXPERIMENTS_DIR.resolve() \
+                else str(self.experiments_dir / job["experiment"])
+            cmd = ["bash", str(PIPELINE), str(job["_video_path"]), target, "--quiet"]
             try:
                 with open(job["_log_path"], "wb") as log:
                     log.write(f"$ {' '.join(cmd)}\n".encode())

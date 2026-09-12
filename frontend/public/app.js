@@ -3,10 +3,22 @@
 // inventory.json, expire.json, recipes.json and events.json in one document. The page polls it
 // and re-renders when the folder changes, so re-running the pipeline shows up by itself.
 // Pick an experiment with ?experiment=<name>; the view is in the hash (#inventory, #recipes, #activity).
+// "Fresh scan" uploads a video to POST /api/experiments/<name>/upload; the server runs backend/pipeline.sh
+// and /api/jobs/<id> reports progress, which the scan modal shows until the run is folded in.
 
 const STEPS_KEY = 'savor-steps-v3';
 const POLL_MS = 5000;        // how often to ask the server whether the experiment folder changed
 const TICK_MS = 60000;       // how often to recompute "hours left" from expires_at without new data
+const JOB_POLL_MS = 1500;    // how often to ask about a running scan
+const NAME_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$/;          // same rule as serve.py
+const VIDEO_EXTS = ['.mp4', '.m4v', '.mov', '.qt', '.webm', '.mkv', '.avi', '.mpg', '.mpeg', '.3gp', '.wmv', '.flv'];
+// Pipeline stages in order, recognised by the prefix each script prints to the log.
+const STAGES = [
+  { key: 'detect.py', label: 'Detect', icon: '◉', re: /^detect: /m },
+  { key: 'update.py', label: 'Inventory', icon: '▦', re: /^update: /m },
+  { key: 'check.py', label: 'Expiry', icon: '♧', re: /^check: /m },
+  { key: 'chef.py', label: 'Recipes', icon: '✦', re: /^chef: /m },
+];
 const VIEWS = ['home', 'inventory', 'recipes', 'activity'];
 const STATUS_ORDER = { expired: 0, expiring_soon: 1, ok: 2, unknown: 3 };
 const STATUS_PILL = { expired: 'urgent', expiring_soon: 'soon', ok: 'fresh', unknown: 'unknown' };
@@ -40,10 +52,15 @@ const state = {
   query: '',
   doneSteps: loadSteps(),
   lastPoll: null,
+  modal: null,          // 'upload' | 'job' | null — which modal is open, so job polls can redraw it
+  job: null,            // the scan job being watched (from /api/jobs/<id>)
+  upload: null,         // { percent, file, experiment } while a video is being sent
 };
 let toastTimer;
 let pollTimer;
 let tickTimer;
+let jobTimer;
+let uploadXhr;
 const app = document.querySelector('#app');
 const modalRoot = document.querySelector('#modalRoot');
 
@@ -213,9 +230,11 @@ async function loadExperiment(name) {
 }
 
 async function boot() {
-  const [index, icons] = await Promise.all([fetchJson('/api/experiments'), fetchJson('/images/index.json')]);
+  const [index, icons, jobs] = await Promise.all([fetchJson('/api/experiments'), fetchJson('/images/index.json'), fetchJson('/api/jobs')]);
   state.index = index;
   state.icons = icons?.items || {};
+  const active = (jobs?.jobs || []).find(j => j.status === 'queued' || j.status === 'running');
+  if (active) { state.job = active; startJobPolling(); }
   const requested = new URLSearchParams(location.search).get('experiment');
   const hash = location.hash.replace('#', '');
   if (VIEWS.includes(hash)) state.view = hash;
@@ -382,7 +401,7 @@ function renderInventory() {
   return `
     <section class="page-heading"><div><p class="eyebrow">Keep tabs, effortlessly</p><h1>Fridge inventory</h1><p>${plural(d.counts.total, 'item')} detected across ${plural(d.runs.length, 'scan')}, sorted by what needs you first.</p></div><span class="date-chip">◷ Expiry checked ${fmtDate(d.checkedAt)}</span></section>
     <section class="panel panel-pad">
-      <div class="inventory-toolbar"><label class="search-wrap"><span>⌕</span><input id="inventorySearch" value="${escapeHtml(state.query)}" placeholder="Search your fridge" aria-label="Search inventory"></label><button class="button outline" data-action="show-alerts">♧ ${plural(filterCounts['Use soon'], 'alert')}</button></div>
+      <div class="inventory-toolbar"><label class="search-wrap"><span>⌕</span><input id="inventorySearch" value="${escapeHtml(state.query)}" placeholder="Search your fridge" aria-label="Search inventory"></label><button class="button outline" data-action="show-alerts">♧ ${plural(filterCounts['Use soon'], 'alert')}</button><button class="button outline" data-action="open-upload">⌁ Fresh scan</button></div>
       <div class="filter-row">${Object.keys(FILTERS).map(name => `<button class="filter-pill ${state.filter === name ? 'is-active' : ''}" data-filter="${name}">${name} <b>${filterCounts[name]}</b></button>`).join('')}</div>
       <div class="inventory-list">${items.length ? items.map(item => foodRow(item)).join('') : emptyState('⌕', 'Nothing matches that', d.counts.total ? 'Try another search or filter.' : 'The pipeline has not put anything in this fridge yet.')}</div>
     </section>
@@ -480,12 +499,26 @@ function render() {
   const card = document.querySelector('#experimentCard');
   card.querySelector('strong').textContent = state.experiment || 'No experiment';
   card.querySelector('small').textContent = d ? `${plural(d.counts.total, 'item')} · ${plural(d.runs.length, 'scan')}` : (state.loading ? 'Loading…' : 'Run backend/pipeline.sh');
+  updateScanBadge();
+}
+
+// Sidebar "Fresh scan" card and the topbar dot reflect the job being watched.
+function updateScanBadge() {
+  const job = state.job;
+  const busy = Boolean(job && (job.status === 'queued' || job.status === 'running'));
+  const card = document.querySelector('#scanCard');
+  card.classList.toggle('is-busy', busy);
+  card.dataset.action = busy ? 'open-job' : 'open-upload';
+  card.querySelector('strong').textContent = busy ? (job.status === 'queued' ? 'Scan queued' : 'Scanning…') : 'Fresh scan';
+  card.querySelector('small').textContent = busy ? `${job.video} · ${stageOf(job).label}` : 'Upload a fridge video';
+  document.querySelector('.scan-button').classList.toggle('is-busy', busy);
+  document.querySelector('.scan-button').dataset.action = busy ? 'open-job' : 'open-upload';
 }
 
 // ---------- modals ----------
 
 function showToast(message) { const toast = document.querySelector('#toast'); toast.textContent = message; toast.classList.add('show'); clearTimeout(toastTimer); toastTimer = setTimeout(() => toast.classList.remove('show'), 2700); }
-function closeModal() { modalRoot.innerHTML = ''; }
+function closeModal() { modalRoot.innerHTML = ''; state.modal = null; if (state.upload && uploadXhr) { uploadXhr.abort(); } state.upload = null; }
 function modalShell(inner, extraClass = '') { return `<div class="modal-backdrop ${extraClass}" data-action="close-modal"><section class="modal" role="dialog" aria-modal="true">${inner}</section></div>`; }
 
 function recipeModal(recipeId) {
@@ -551,6 +584,165 @@ function showAlerts() {
   modalRoot.innerHTML = modalShell(`<header class="modal-head"><h2>Kitchen updates</h2><button class="modal-close" data-action="close-modal" aria-label="Close">×</button></header><div class="modal-body"><p>${urgent.length ? `${plural(urgent.length, 'ingredient')} inside the ${d.threshold} hour window.` : 'Everything in your kitchen is looking fresh.'}</p>${urgent.map(item => foodRow(item, true)).join('')}</div>`);
 }
 
+// ---------- fresh scan: upload a video, watch the pipeline ----------
+
+function fmtBytes(n) { return n >= 1024 ** 3 ? `${(n / 1024 ** 3).toFixed(2)} GB` : n >= 1024 ** 2 ? `${(n / 1024 ** 2).toFixed(1)} MB` : `${Math.round(n / 1024)} KB`; }
+
+function uploadModal() {
+  if (state.job && (state.job.status === 'queued' || state.job.status === 'running')) { jobModal(); return; }
+  state.modal = 'upload';
+  const names = (state.index?.experiments || []).map(e => e.name);
+  const suggested = state.experiment || names[0] || 'experiment1';
+  modalRoot.innerHTML = modalShell(`
+    <header class="modal-head"><div><p class="eyebrow">Fresh scan</p><h2>Upload a fridge video</h2></div><button class="modal-close" data-action="close-modal" aria-label="Close">×</button></header>
+    <div class="modal-body">
+      <p>The video goes to <code>backend/experiments/&lt;experiment&gt;/uploads/</code>, then <code>pipeline.sh</code> runs: items seen going in join the inventory, items seen leaving come off it, expiry and recipes are recomputed.</p>
+      <form id="uploadForm" class="upload-form">
+        <label class="field"><span>Experiment</span><input type="text" name="experiment" value="${escapeHtml(suggested)}" list="experimentNames" autocomplete="off" spellcheck="false" required><small>An existing folder adds to it; a new name starts a new experiment.</small></label>
+        <datalist id="experimentNames">${names.map(n => `<option value="${escapeHtml(n)}">`).join('')}</datalist>
+        <label class="drop" for="uploadFile"><input id="uploadFile" type="file" name="video" accept="video/*,.mov,.mp4,.m4v,.webm,.mkv,.avi,.mpg,.mpeg,.3gp,.wmv,.flv"><b>Drop a video here or click to choose</b><small>${VIDEO_EXTS.join(' · ')}</small><span class="picked" id="pickedFile"></span></label>
+        <div id="uploadError"></div>
+        <div id="uploadProgress" hidden><div class="progress"><b style="width:0%"></b></div><small class="refresh-note" id="uploadProgressText">Uploading…</small></div>
+        <div class="modal-actions"><button type="button" class="button outline" data-action="close-modal">Cancel</button><button type="submit" class="button" id="uploadSubmit">Scan this video →</button></div>
+      </form>
+    </div>`);
+}
+
+function showPickedFile(file) { const el = modalRoot.querySelector('#pickedFile'); if (el) el.textContent = file ? `${file.name} · ${fmtBytes(file.size)}` : ''; setUploadError(''); }
+function setUploadError(message) { const el = modalRoot.querySelector('#uploadError'); if (el) el.innerHTML = message ? `<p class="form-error">${escapeHtml(message)}</p>` : ''; }
+
+function startUpload(file, experiment) {
+  state.upload = { percent: 0, file, experiment };
+  const form = modalRoot.querySelector('#uploadForm');
+  form.querySelector('#uploadSubmit').disabled = true;
+  form.querySelector('#uploadProgress').hidden = false;
+  setUploadError('');
+  const xhr = uploadXhr = new XMLHttpRequest();
+  xhr.open('POST', `${apiUrl(experiment)}/upload?filename=${encodeURIComponent(file.name)}`);
+  xhr.upload.onprogress = event => {
+    if (!event.lengthComputable) return;
+    const percent = Math.round(event.loaded / event.total * 100);
+    const bar = modalRoot.querySelector('#uploadProgress b'), text = modalRoot.querySelector('#uploadProgressText');
+    if (bar) bar.style.width = `${percent}%`;
+    if (text) text.textContent = `Uploading ${file.name} · ${percent}% of ${fmtBytes(file.size)}`;
+  };
+  xhr.onerror = () => { state.upload = null; setUploadError('Upload failed — is frontend/serve.py still running?'); form.querySelector('#uploadSubmit').disabled = false; };
+  xhr.onload = () => {
+    state.upload = null;
+    let body = null;
+    try { body = JSON.parse(xhr.responseText); } catch { /* not JSON */ }
+    if (xhr.status !== 202 || !body?.job) {
+      setUploadError(body?.error || `Server answered ${xhr.status}.`);
+      form.querySelector('#uploadSubmit').disabled = false;
+      form.querySelector('#uploadProgress').hidden = true;
+      return;
+    }
+    state.job = body.job;
+    jobModal();
+    startJobPolling();
+  };
+  xhr.send(file);
+}
+
+function startJobPolling() {
+  clearInterval(jobTimer);
+  jobTimer = setInterval(pollJob, JOB_POLL_MS);
+  updateScanBadge();
+}
+
+async function pollJob() {
+  const job = state.job;
+  if (!job) { clearInterval(jobTimer); return; }
+  const res = await fetchJson(`/api/jobs/${encodeURIComponent(job.id)}`);
+  if (!res?.job) return;
+  const wasActive = job.status === 'queued' || job.status === 'running';
+  state.job = res.job;
+  const active = res.job.status === 'queued' || res.job.status === 'running';
+  if (state.modal === 'job') jobModal();
+  updateScanBadge();
+  if (!active) {
+    clearInterval(jobTimer);
+    if (wasActive) {
+      if (res.job.status === 'done') showToast(`Scan of ${res.job.video} finished`);
+      else showToast(`Scan of ${res.job.video} failed`);
+      // Pull the new files straight away (the picker may also gain a new experiment), then redraw
+      // the result with the icons the fresh inventory knows about.
+      await poll();
+      if (state.modal === 'job') jobModal();
+    }
+  }
+}
+
+// Which stage the pipeline is in, from what it has printed so far.
+function stageOf(job) {
+  const log = job.log || '';
+  let index = -1;
+  STAGES.forEach((stage, i) => { if (stage.re.test(log)) index = i; });
+  if (job.status === 'queued') return { index: -1, label: 'waiting' };
+  if (index < 0) return { index: 0, label: 'starting' };
+  return { index, label: STAGES[index].label.toLowerCase() };
+}
+
+function failedStage(job) { const m = /^pipeline\.sh: (\S+) failed \(exit/m.exec(job.log || ''); return m ? m[1] : null; }
+
+function elapsed(job) {
+  const start = Date.parse(job.started_at || job.queued_at), end = Date.parse(job.finished_at) || Date.now();
+  if (!Number.isFinite(start)) return '';
+  const s = Math.max(0, Math.round((end - start) / 1000));
+  return s < 60 ? `${s} s` : `${Math.floor(s / 60)} min ${s % 60} s`;
+}
+
+function jobModal() {
+  const job = state.job;
+  if (!job) return;
+  state.modal = 'job';
+  const active = job.status === 'queued' || job.status === 'running';
+  const current = stageOf(job).index;
+  const failed = failedStage(job);
+  const stages = STAGES.map((stage, i) => {
+    let cls = '';
+    if (job.status === 'done' || i < current) cls = 'is-done';
+    else if (job.status === 'failed') cls = failed === stage.key || (!failed && i === current) ? 'is-failed' : (i < current ? 'is-done' : '');
+    else if (i === current) cls = 'is-active';
+    return `<div class="stage ${cls}"><span>${stage.icon}</span>${stage.label}</div>`;
+  }).join('');
+  const title = job.status === 'queued' ? 'Waiting for the previous scan…' : job.status === 'running' ? 'Looking inside your fridge…' : job.status === 'done' ? 'Scan complete' : 'Scan failed';
+  const orbit = job.status === 'done' ? '<span class="state-orbit is-done">✓</span>' : job.status === 'failed' ? '<span class="state-orbit is-failed">✕</span>' : '<span class="state-orbit">⌁</span>';
+  const sub = `${escapeHtml(job.video)} → <code>${escapeHtml(job.experiment)}</code>${job.started_at ? ` · ${elapsed(job)}` : ''}${job.exit_code != null && job.exit_code !== 0 ? ` · exit ${job.exit_code}` : ''}`;
+
+  let result = '';
+  if (job.status === 'done' && job.result) {
+    const sum = job.result.summary;
+    const ins = job.result.events.filter(e => e.action === 'in'), outs = job.result.events.filter(e => e.action === 'out');
+    const row = e => `<div class="food-row is-static"><span class="badge ${e.action === 'in' ? 'in' : 'out'}">${escapeHtml(e.action)}</span>${iconHtml({ object: e.object, matched: state.data?.items.find(i => i.item_id === e.item_id)?.matched ?? null })}<span class="food-copy"><strong>${escapeHtml(e.object)}</strong><small>${fmtDate(e.time)} · #${e.item_id}</small></span></div>`;
+    result = `<p>${sum ? `${plural(sum.events, 'event')} in ${sum.duration_s != null ? `${sum.duration_s.toFixed(1)} s of video` : 'the video'}: <b>+${sum.added}</b> in, <b>−${sum.removed}</b> out${sum.untracked_removed ? `, ${sum.untracked_removed} out that were never tracked` : ''}. Run <code>${escapeHtml(job.result.run)}</code>.` : 'The run finished but its summary is not in events.json yet.'}</p>
+      <div class="result-lists">
+        ${ins.length ? `<div><h3>Went in</h3><div class="food-list">${ins.map(row).join('')}</div></div>` : ''}
+        ${outs.length ? `<div><h3>Came out</h3><div class="food-list">${outs.map(row).join('')}</div></div>` : ''}
+        ${!job.result.events.length ? emptyState('⌁', 'Nothing crossed the door', 'The model saw no item enter or leave in this video.') : ''}
+      </div>`;
+  } else if (job.status === 'done') {
+    result = '<p>Finished, but no run summary was found in events.json.</p>';
+  } else if (job.status === 'failed') {
+    result = `<p class="form-error">${escapeHtml(job.error || `${failed || 'The pipeline'} exited with code ${job.exit_code}. The log below has the reason.`)}</p>`;
+  }
+
+  const actions = active
+    ? '<div class="modal-actions"><button class="button outline" data-action="close-modal">Keep scanning in the background</button></div>'
+    : `<div class="modal-actions"><button class="button outline" data-action="open-upload">Scan another video</button>${job.status === 'done' ? `<button class="button" data-action="open-job-experiment">Open ${escapeHtml(job.experiment)} →</button>` : ''}</div>`;
+
+  modalRoot.innerHTML = modalShell(`
+    <div class="job-head">${orbit}<div><h2>${title}</h2><p>${sub}</p></div></div>
+    <div class="modal-body">
+      <div class="stage-list">${stages}</div>
+      ${result}
+      <details ${active || job.status === 'failed' ? 'open' : ''}><summary class="detail-title" style="cursor:pointer">Pipeline log${job.log_truncated ? ' (tail)' : ''} · <a href="/api/jobs/${encodeURIComponent(job.id)}/log" target="_blank" rel="noopener">full ↗</a></summary><pre class="log-pre job-log">${escapeHtml(job.log || (job.status === 'queued' ? 'Queued behind another scan.' : 'Starting…'))}</pre></details>
+      ${actions}
+    </div>`, 'log-modal');
+  const pre = modalRoot.querySelector('.job-log');
+  if (pre) pre.scrollTop = pre.scrollHeight;
+}
+
 // ---------- events ----------
 
 document.addEventListener('click', event => {
@@ -571,12 +763,21 @@ document.addEventListener('click', event => {
   if (target.dataset.filter) { state.filter = target.dataset.filter; render(); return; }
   const action = target.dataset.action;
   if (action === 'close-modal') { if (target === event.target || event.target.closest('.modal-close')) closeModal(); return; }
-  if (!state.data && action !== 'reload') return;
+  if (!state.data && !['reload', 'open-upload', 'open-job', 'pick-file', 'open-job-experiment'].includes(action)) return;
   if (action === 'reload') { closeModal(); if (state.experiment) loadExperiment(state.experiment); else boot(); showToast('Reloading experiment data'); }
   if (action === 'open-recipe') recipeModal(target.dataset.recipe);
   if (action === 'open-item') itemModal(target.dataset.id);
   if (action === 'open-log') logModal(target.dataset.run);
   if (action === 'show-alerts') showAlerts();
+  if (action === 'open-upload') uploadModal();
+  if (action === 'open-job') { if (state.job) jobModal(); else uploadModal(); }
+  if (action === 'pick-file') modalRoot.querySelector('#uploadFile')?.click();
+  if (action === 'open-job-experiment') {
+    const job = state.job;
+    closeModal();
+    state.view = 'inventory'; state.filter = 'All'; state.query = '';
+    if (job && job.experiment !== state.experiment) setExperiment(job.experiment); else { render(); poll(); }
+  }
   if (action === 'toggle-step') {
     const recipe = state.data.recipes.find(r => r.id === target.dataset.recipe);
     const key = `${state.data.name}::${recipe.name}`;
@@ -610,6 +811,36 @@ document.addEventListener('input', event => {
 });
 
 document.addEventListener('keydown', event => { if (event.key === 'Escape') closeModal(); });
+
+document.addEventListener('submit', event => {
+  if (event.target.id !== 'uploadForm') return;
+  event.preventDefault();
+  const name = event.target.elements.experiment.value.trim();
+  const file = event.target.elements.video.files[0];
+  const problem = !NAME_RE.test(name) ? 'Experiment name: letters, digits, dots, dashes and underscores only.'
+    : name === 'latest' ? '“latest” is reserved.'
+    : !file ? 'Choose a video first.'
+    : !VIDEO_EXTS.some(ext => file.name.toLowerCase().endsWith(ext)) ? `Not a video the pipeline reads (${VIDEO_EXTS.join(', ')}).`
+    : null;
+  if (problem) { setUploadError(problem); return; }
+  startUpload(file, name);
+});
+
+document.addEventListener('change', event => {
+  if (event.target.id === 'uploadFile') showPickedFile(event.target.files[0]);
+});
+
+// Drag a video onto the drop zone.
+document.addEventListener('dragover', event => { const zone = event.target.closest?.('.drop'); if (zone) { event.preventDefault(); zone.classList.add('is-over'); } });
+document.addEventListener('dragleave', event => { event.target.closest?.('.drop')?.classList.remove('is-over'); });
+document.addEventListener('drop', event => {
+  const zone = event.target.closest?.('.drop');
+  if (!zone) return;
+  event.preventDefault();
+  zone.classList.remove('is-over');
+  const input = zone.querySelector('#uploadFile');
+  if (input && event.dataTransfer?.files?.length) { input.files = event.dataTransfer.files; showPickedFile(input.files[0]); }
+});
 
 window.addEventListener('hashchange', () => {
   const hash = location.hash.replace('#', '');
