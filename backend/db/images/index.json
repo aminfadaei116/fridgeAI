@@ -1,0 +1,979 @@
+{
+  "source": {
+    "name": "Fluent Emoji (3D)",
+    "repo": "https://github.com/microsoft/fluentui-emoji",
+    "commit": "1ffb34c752ecf5d402f04cfb4b392c77f57c54bc",
+    "license": "MIT",
+    "size": "256x256 RGBA PNG"
+  },
+  "items": {
+    "milk": {
+      "file": "milk.png",
+      "emoji": "Glass of milk"
+    },
+    "chocolate milk": {
+      "file": "chocolate_milk.png",
+      "emoji": "Glass of milk"
+    },
+    "almond milk": {
+      "file": "almond_milk.png",
+      "emoji": "Glass of milk"
+    },
+    "soy milk": {
+      "file": "soy_milk.png",
+      "emoji": "Glass of milk"
+    },
+    "oat milk": {
+      "file": "oat_milk.png",
+      "emoji": "Glass of milk"
+    },
+    "cream": {
+      "file": "cream.png",
+      "emoji": "Pouring liquid"
+    },
+    "half and half": {
+      "file": "half_and_half.png",
+      "emoji": "Pouring liquid"
+    },
+    "sour cream": {
+      "file": "sour_cream.png",
+      "emoji": "Bowl with spoon"
+    },
+    "yogurt": {
+      "file": "yogurt.png",
+      "emoji": "Bowl with spoon"
+    },
+    "greek yogurt": {
+      "file": "greek_yogurt.png",
+      "emoji": "Bowl with spoon"
+    },
+    "cottage cheese": {
+      "file": "cottage_cheese.png",
+      "emoji": "Cheese wedge"
+    },
+    "cream cheese": {
+      "file": "cream_cheese.png",
+      "emoji": "Cheese wedge"
+    },
+    "ricotta cheese": {
+      "file": "ricotta_cheese.png",
+      "emoji": "Cheese wedge"
+    },
+    "mozzarella": {
+      "file": "mozzarella.png",
+      "emoji": "Cheese wedge"
+    },
+    "cheddar cheese": {
+      "file": "cheddar_cheese.png",
+      "emoji": "Cheese wedge"
+    },
+    "parmesan cheese": {
+      "file": "parmesan_cheese.png",
+      "emoji": "Cheese wedge"
+    },
+    "feta cheese": {
+      "file": "feta_cheese.png",
+      "emoji": "Cheese wedge"
+    },
+    "brie": {
+      "file": "brie.png",
+      "emoji": "Cheese wedge"
+    },
+    "butter": {
+      "file": "butter.png",
+      "emoji": "Butter"
+    },
+    "margarine": {
+      "file": "margarine.png",
+      "emoji": "Butter"
+    },
+    "eggs": {
+      "file": "eggs.png",
+      "emoji": "Egg"
+    },
+    "hard boiled eggs": {
+      "file": "hard_boiled_eggs.png",
+      "emoji": "Egg"
+    },
+    "raw chicken": {
+      "file": "raw_chicken.png",
+      "emoji": "Poultry leg"
+    },
+    "cooked chicken": {
+      "file": "cooked_chicken.png",
+      "emoji": "Poultry leg"
+    },
+    "chicken breast": {
+      "file": "chicken_breast.png",
+      "emoji": "Poultry leg"
+    },
+    "ground chicken": {
+      "file": "ground_chicken.png",
+      "emoji": "Poultry leg"
+    },
+    "raw turkey": {
+      "file": "raw_turkey.png",
+      "emoji": "Poultry leg"
+    },
+    "cooked turkey": {
+      "file": "cooked_turkey.png",
+      "emoji": "Poultry leg"
+    },
+    "ground turkey": {
+      "file": "ground_turkey.png",
+      "emoji": "Poultry leg"
+    },
+    "raw beef": {
+      "file": "raw_beef.png",
+      "emoji": "Cut of meat"
+    },
+    "ground beef": {
+      "file": "ground_beef.png",
+      "emoji": "Cut of meat"
+    },
+    "cooked beef": {
+      "file": "cooked_beef.png",
+      "emoji": "Cut of meat"
+    },
+    "steak": {
+      "file": "steak.png",
+      "emoji": "Cut of meat"
+    },
+    "roast beef": {
+      "file": "roast_beef.png",
+      "emoji": "Cut of meat"
+    },
+    "ham": {
+      "file": "ham.png",
+      "emoji": "Meat on bone"
+    },
+    "deli ham": {
+      "file": "deli_ham.png",
+      "emoji": "Meat on bone"
+    },
+    "deli turkey": {
+      "file": "deli_turkey.png",
+      "emoji": "Poultry leg"
+    },
+    "salami": {
+      "file": "salami.png",
+      "emoji": "Bacon"
+    },
+    "bacon": {
+      "file": "bacon.png",
+      "emoji": "Bacon"
+    },
+    "sausage": {
+      "file": "sausage.png",
+      "emoji": "Hot dog"
+    },
+    "hot dogs": {
+      "file": "hot_dogs.png",
+      "emoji": "Hot dog"
+    },
+    "raw pork": {
+      "file": "raw_pork.png",
+      "emoji": "Cut of meat"
+    },
+    "ground pork": {
+      "file": "ground_pork.png",
+      "emoji": "Cut of meat"
+    },
+    "cooked pork": {
+      "file": "cooked_pork.png",
+      "emoji": "Meat on bone"
+    },
+    "raw fish": {
+      "file": "raw_fish.png",
+      "emoji": "Fish"
+    },
+    "cooked fish": {
+      "file": "cooked_fish.png",
+      "emoji": "Fish"
+    },
+    "salmon": {
+      "file": "salmon.png",
+      "emoji": "Fish"
+    },
+    "tuna": {
+      "file": "tuna.png",
+      "emoji": "Fish"
+    },
+    "shrimp": {
+      "file": "shrimp.png",
+      "emoji": "Shrimp"
+    },
+    "cooked shrimp": {
+      "file": "cooked_shrimp.png",
+      "emoji": "Fried shrimp"
+    },
+    "smoked salmon": {
+      "file": "smoked_salmon.png",
+      "emoji": "Fish"
+    },
+    "canned tuna": {
+      "file": "canned_tuna.png",
+      "emoji": "Canned food"
+    },
+    "apple": {
+      "file": "apple.png",
+      "emoji": "Red apple"
+    },
+    "banana": {
+      "file": "banana.png",
+      "emoji": "Banana"
+    },
+    "orange": {
+      "file": "orange.png",
+      "emoji": "Tangerine"
+    },
+    "lemon": {
+      "file": "lemon.png",
+      "emoji": "Lemon"
+    },
+    "lime": {
+      "file": "lime.png",
+      "emoji": "Lime"
+    },
+    "grapefruit": {
+      "file": "grapefruit.png",
+      "emoji": "Tangerine"
+    },
+    "pear": {
+      "file": "pear.png",
+      "emoji": "Pear"
+    },
+    "peach": {
+      "file": "peach.png",
+      "emoji": "Peach"
+    },
+    "nectarine": {
+      "file": "nectarine.png",
+      "emoji": "Peach"
+    },
+    "plum": {
+      "file": "plum.png",
+      "emoji": "Peach"
+    },
+    "mango": {
+      "file": "mango.png",
+      "emoji": "Mango"
+    },
+    "pineapple": {
+      "file": "pineapple.png",
+      "emoji": "Pineapple"
+    },
+    "kiwi": {
+      "file": "kiwi.png",
+      "emoji": "Kiwi fruit"
+    },
+    "grapes": {
+      "file": "grapes.png",
+      "emoji": "Grapes"
+    },
+    "strawberries": {
+      "file": "strawberries.png",
+      "emoji": "Strawberry"
+    },
+    "blueberries": {
+      "file": "blueberries.png",
+      "emoji": "Blueberries"
+    },
+    "raspberries": {
+      "file": "raspberries.png",
+      "emoji": "Strawberry"
+    },
+    "blackberries": {
+      "file": "blackberries.png",
+      "emoji": "Blueberries"
+    },
+    "cherries": {
+      "file": "cherries.png",
+      "emoji": "Cherries"
+    },
+    "watermelon": {
+      "file": "watermelon.png",
+      "emoji": "Watermelon"
+    },
+    "cantaloupe": {
+      "file": "cantaloupe.png",
+      "emoji": "Melon"
+    },
+    "honeydew": {
+      "file": "honeydew.png",
+      "emoji": "Melon"
+    },
+    "avocado": {
+      "file": "avocado.png",
+      "emoji": "Avocado"
+    },
+    "cut fruit": {
+      "file": "cut_fruit.png",
+      "emoji": "Watermelon"
+    },
+    "fruit salad": {
+      "file": "fruit_salad.png",
+      "emoji": "Bowl with spoon"
+    },
+    "lettuce": {
+      "file": "lettuce.png",
+      "emoji": "Leafy green"
+    },
+    "romaine lettuce": {
+      "file": "romaine_lettuce.png",
+      "emoji": "Leafy green"
+    },
+    "spinach": {
+      "file": "spinach.png",
+      "emoji": "Leafy green"
+    },
+    "kale": {
+      "file": "kale.png",
+      "emoji": "Leafy green"
+    },
+    "arugula": {
+      "file": "arugula.png",
+      "emoji": "Leafy green"
+    },
+    "cabbage": {
+      "file": "cabbage.png",
+      "emoji": "Leafy green"
+    },
+    "broccoli": {
+      "file": "broccoli.png",
+      "emoji": "Broccoli"
+    },
+    "cauliflower": {
+      "file": "cauliflower.png",
+      "emoji": "Broccoli"
+    },
+    "carrots": {
+      "file": "carrots.png",
+      "emoji": "Carrot"
+    },
+    "celery": {
+      "file": "celery.png",
+      "emoji": "Leafy green"
+    },
+    "cucumber": {
+      "file": "cucumber.png",
+      "emoji": "Cucumber"
+    },
+    "zucchini": {
+      "file": "zucchini.png",
+      "emoji": "Cucumber"
+    },
+    "bell pepper": {
+      "file": "bell_pepper.png",
+      "emoji": "Bell pepper"
+    },
+    "mushrooms": {
+      "file": "mushrooms.png",
+      "emoji": "Brown mushroom"
+    },
+    "asparagus": {
+      "file": "asparagus.png",
+      "emoji": "Herb"
+    },
+    "green beans": {
+      "file": "green_beans.png",
+      "emoji": "Pea pod"
+    },
+    "snap peas": {
+      "file": "snap_peas.png",
+      "emoji": "Pea pod"
+    },
+    "brussels sprouts": {
+      "file": "brussels_sprouts.png",
+      "emoji": "Broccoli"
+    },
+    "corn": {
+      "file": "corn.png",
+      "emoji": "Ear of corn"
+    },
+    "eggplant": {
+      "file": "eggplant.png",
+      "emoji": "Eggplant"
+    },
+    "beets": {
+      "file": "beets.png",
+      "emoji": "Roasted sweet potato"
+    },
+    "radishes": {
+      "file": "radishes.png",
+      "emoji": "Carrot"
+    },
+    "fresh herbs": {
+      "file": "fresh_herbs.png",
+      "emoji": "Herb"
+    },
+    "onion": {
+      "file": "onion.png",
+      "emoji": "Onion"
+    },
+    "garlic": {
+      "file": "garlic.png",
+      "emoji": "Garlic"
+    },
+    "potato": {
+      "file": "potato.png",
+      "emoji": "Potato"
+    },
+    "sweet potato": {
+      "file": "sweet_potato.png",
+      "emoji": "Roasted sweet potato"
+    },
+    "tomato": {
+      "file": "tomato.png",
+      "emoji": "Tomato"
+    },
+    "cherry tomatoes": {
+      "file": "cherry_tomatoes.png",
+      "emoji": "Tomato"
+    },
+    "cut vegetables": {
+      "file": "cut_vegetables.png",
+      "emoji": "Carrot"
+    },
+    "bread": {
+      "file": "bread.png",
+      "emoji": "Bread"
+    },
+    "bagels": {
+      "file": "bagels.png",
+      "emoji": "Bagel"
+    },
+    "tortillas": {
+      "file": "tortillas.png",
+      "emoji": "Flatbread"
+    },
+    "english muffins": {
+      "file": "english_muffins.png",
+      "emoji": "Bagel"
+    },
+    "pita bread": {
+      "file": "pita_bread.png",
+      "emoji": "Flatbread"
+    },
+    "pizza dough": {
+      "file": "pizza_dough.png",
+      "emoji": "Flatbread"
+    },
+    "fresh pasta": {
+      "file": "fresh_pasta.png",
+      "emoji": "Spaghetti"
+    },
+    "cooked pasta": {
+      "file": "cooked_pasta.png",
+      "emoji": "Spaghetti"
+    },
+    "cooked rice": {
+      "file": "cooked_rice.png",
+      "emoji": "Cooked rice"
+    },
+    "cooked quinoa": {
+      "file": "cooked_quinoa.png",
+      "emoji": "Cooked rice"
+    },
+    "cooked beans": {
+      "file": "cooked_beans.png",
+      "emoji": "Beans"
+    },
+    "tofu": {
+      "file": "tofu.png",
+      "emoji": "Oden"
+    },
+    "tempeh": {
+      "file": "tempeh.png",
+      "emoji": "Beans"
+    },
+    "hummus": {
+      "file": "hummus.png",
+      "emoji": "Bowl with spoon"
+    },
+    "guacamole": {
+      "file": "guacamole.png",
+      "emoji": "Avocado"
+    },
+    "salsa": {
+      "file": "salsa.png",
+      "emoji": "Hot pepper"
+    },
+    "pesto": {
+      "file": "pesto.png",
+      "emoji": "Herb"
+    },
+    "tomato sauce": {
+      "file": "tomato_sauce.png",
+      "emoji": "Tomato"
+    },
+    "mayonnaise": {
+      "file": "mayonnaise.png",
+      "emoji": "Jar"
+    },
+    "ketchup": {
+      "file": "ketchup.png",
+      "emoji": "Tomato"
+    },
+    "mustard": {
+      "file": "mustard.png",
+      "emoji": "Jar"
+    },
+    "soy sauce": {
+      "file": "soy_sauce.png",
+      "emoji": "Jar"
+    },
+    "salad dressing": {
+      "file": "salad_dressing.png",
+      "emoji": "Jar"
+    },
+    "jam": {
+      "file": "jam.png",
+      "emoji": "Honey pot"
+    },
+    "peanut butter": {
+      "file": "peanut_butter.png",
+      "emoji": "Peanuts"
+    },
+    "leftovers": {
+      "file": "leftovers.png",
+      "emoji": "Takeout box"
+    },
+    "soup": {
+      "file": "soup.png",
+      "emoji": "Pot of food"
+    },
+    "stew": {
+      "file": "stew.png",
+      "emoji": "Pot of food"
+    },
+    "chili": {
+      "file": "chili.png",
+      "emoji": "Pot of food"
+    },
+    "curry": {
+      "file": "curry.png",
+      "emoji": "Curry rice"
+    },
+    "casserole": {
+      "file": "casserole.png",
+      "emoji": "Shallow pan of food"
+    },
+    "pizza": {
+      "file": "pizza.png",
+      "emoji": "Pizza"
+    },
+    "sandwich": {
+      "file": "sandwich.png",
+      "emoji": "Sandwich"
+    },
+    "burger": {
+      "file": "burger.png",
+      "emoji": "Hamburger"
+    },
+    "fried chicken": {
+      "file": "fried_chicken.png",
+      "emoji": "Poultry leg"
+    },
+    "rotisserie chicken": {
+      "file": "rotisserie_chicken.png",
+      "emoji": "Poultry leg"
+    },
+    "takeout": {
+      "file": "takeout.png",
+      "emoji": "Takeout box"
+    },
+    "prepared salad": {
+      "file": "prepared_salad.png",
+      "emoji": "Green salad"
+    },
+    "pasta salad": {
+      "file": "pasta_salad.png",
+      "emoji": "Green salad"
+    },
+    "potato salad": {
+      "file": "potato_salad.png",
+      "emoji": "Potato"
+    },
+    "egg salad": {
+      "file": "egg_salad.png",
+      "emoji": "Egg"
+    },
+    "tuna salad": {
+      "file": "tuna_salad.png",
+      "emoji": "Fish"
+    },
+    "coleslaw": {
+      "file": "coleslaw.png",
+      "emoji": "Leafy green"
+    },
+    "macaroni and cheese": {
+      "file": "macaroni_and_cheese.png",
+      "emoji": "Spaghetti"
+    },
+    "lasagna": {
+      "file": "lasagna.png",
+      "emoji": "Shallow pan of food"
+    },
+    "burrito": {
+      "file": "burrito.png",
+      "emoji": "Burrito"
+    },
+    "taco filling": {
+      "file": "taco_filling.png",
+      "emoji": "Taco"
+    },
+    "orange juice": {
+      "file": "orange_juice.png",
+      "emoji": "Beverage box"
+    },
+    "apple juice": {
+      "file": "apple_juice.png",
+      "emoji": "Beverage box"
+    },
+    "lemonade": {
+      "file": "lemonade.png",
+      "emoji": "Cup with straw"
+    },
+    "smoothie": {
+      "file": "smoothie.png",
+      "emoji": "Cup with straw"
+    },
+    "coffee": {
+      "file": "coffee.png",
+      "emoji": "Hot beverage"
+    },
+    "iced tea": {
+      "file": "iced_tea.png",
+      "emoji": "Cup with straw"
+    },
+    "beer": {
+      "file": "beer.png",
+      "emoji": "Beer mug"
+    },
+    "wine": {
+      "file": "wine.png",
+      "emoji": "Wine glass"
+    },
+    "sparkling water": {
+      "file": "sparkling_water.png",
+      "emoji": "Droplet"
+    },
+    "cheese": {
+      "file": "cheese.png",
+      "emoji": "Cheese wedge"
+    },
+    "meat": {
+      "file": "meat.png",
+      "emoji": "Cut of meat"
+    },
+    "chicken": {
+      "file": "chicken.png",
+      "emoji": "Poultry leg"
+    },
+    "beef": {
+      "file": "beef.png",
+      "emoji": "Cut of meat"
+    },
+    "pork": {
+      "file": "pork.png",
+      "emoji": "Cut of meat"
+    },
+    "fish": {
+      "file": "fish.png",
+      "emoji": "Fish"
+    },
+    "seafood": {
+      "file": "seafood.png",
+      "emoji": "Shrimp"
+    },
+    "deli meat": {
+      "file": "deli_meat.png",
+      "emoji": "Bacon"
+    },
+    "lunch meat": {
+      "file": "lunch_meat.png",
+      "emoji": "Bacon"
+    },
+    "vegetables": {
+      "file": "vegetables.png",
+      "emoji": "Broccoli"
+    },
+    "fruit": {
+      "file": "fruit.png",
+      "emoji": "Red apple"
+    },
+    "berries": {
+      "file": "berries.png",
+      "emoji": "Blueberries"
+    },
+    "salad": {
+      "file": "salad.png",
+      "emoji": "Green salad"
+    },
+    "leafy greens": {
+      "file": "leafy_greens.png",
+      "emoji": "Leafy green"
+    },
+    "salad greens": {
+      "file": "salad_greens.png",
+      "emoji": "Leafy green"
+    },
+    "herbs": {
+      "file": "herbs.png",
+      "emoji": "Herb"
+    },
+    "sauce": {
+      "file": "sauce.png",
+      "emoji": "Jar"
+    },
+    "dip": {
+      "file": "dip.png",
+      "emoji": "Bowl with spoon"
+    },
+    "dressing": {
+      "file": "dressing.png",
+      "emoji": "Jar"
+    },
+    "condiment": {
+      "file": "condiment.png",
+      "emoji": "Jar"
+    },
+    "juice": {
+      "file": "juice.png",
+      "emoji": "Beverage box"
+    },
+    "soda": {
+      "file": "soda.png",
+      "emoji": "Cup with straw"
+    },
+    "cola": {
+      "file": "cola.png",
+      "emoji": "Cup with straw"
+    },
+    "soft drink": {
+      "file": "soft_drink.png",
+      "emoji": "Cup with straw"
+    },
+    "energy drink": {
+      "file": "energy_drink.png",
+      "emoji": "Cup with straw"
+    },
+    "water": {
+      "file": "water.png",
+      "emoji": "Droplet"
+    },
+    "bottled water": {
+      "file": "bottled_water.png",
+      "emoji": "Droplet"
+    },
+    "sports drink": {
+      "file": "sports_drink.png",
+      "emoji": "Cup with straw"
+    },
+    "drink": {
+      "file": "drink.png",
+      "emoji": "Cup with straw"
+    },
+    "beverage": {
+      "file": "beverage.png",
+      "emoji": "Cup with straw"
+    },
+    "yoghurt": {
+      "file": "yoghurt.png",
+      "emoji": "Bowl with spoon"
+    },
+    "mayo": {
+      "file": "mayo.png",
+      "emoji": "Jar"
+    },
+    "string cheese": {
+      "file": "string_cheese.png",
+      "emoji": "Cheese wedge"
+    },
+    "cheese stick": {
+      "file": "cheese_stick.png",
+      "emoji": "Cheese wedge"
+    },
+    "mozzarella stick": {
+      "file": "mozzarella_stick.png",
+      "emoji": "Cheese wedge"
+    },
+    "sliced cheese": {
+      "file": "sliced_cheese.png",
+      "emoji": "Cheese wedge"
+    },
+    "shredded cheese": {
+      "file": "shredded_cheese.png",
+      "emoji": "Cheese wedge"
+    },
+    "cheese slices": {
+      "file": "cheese_slices.png",
+      "emoji": "Cheese wedge"
+    },
+    "hotdog": {
+      "file": "hotdog.png",
+      "emoji": "Hot dog"
+    },
+    "frankfurter": {
+      "file": "frankfurter.png",
+      "emoji": "Hot dog"
+    },
+    "wiener": {
+      "file": "wiener.png",
+      "emoji": "Hot dog"
+    },
+    "cold cuts": {
+      "file": "cold_cuts.png",
+      "emoji": "Bacon"
+    },
+    "scallion": {
+      "file": "scallion.png",
+      "emoji": "Herb"
+    },
+    "green onion": {
+      "file": "green_onion.png",
+      "emoji": "Herb"
+    },
+    "chili pepper": {
+      "file": "chili_pepper.png",
+      "emoji": "Hot pepper"
+    },
+    "jalapeno": {
+      "file": "jalapeno.png",
+      "emoji": "Hot pepper"
+    },
+    "capsicum": {
+      "file": "capsicum.png",
+      "emoji": "Bell pepper"
+    },
+    "cilantro": {
+      "file": "cilantro.png",
+      "emoji": "Herb"
+    },
+    "parsley": {
+      "file": "parsley.png",
+      "emoji": "Herb"
+    },
+    "basil": {
+      "file": "basil.png",
+      "emoji": "Herb"
+    },
+    "ginger": {
+      "file": "ginger.png",
+      "emoji": "Ginger root"
+    },
+    "leftover": {
+      "file": "leftover.png",
+      "emoji": "Takeout box"
+    },
+    "takeaway": {
+      "file": "takeaway.png",
+      "emoji": "Takeout box"
+    },
+    "meal prep": {
+      "file": "meal_prep.png",
+      "emoji": "Bento box"
+    },
+    "cooked meal": {
+      "file": "cooked_meal.png",
+      "emoji": "Fork and knife with plate"
+    },
+    "dinner": {
+      "file": "dinner.png",
+      "emoji": "Fork and knife with plate"
+    },
+    "lunch": {
+      "file": "lunch.png",
+      "emoji": "Bento box"
+    },
+    "noodles": {
+      "file": "noodles.png",
+      "emoji": "Steaming bowl"
+    },
+    "rice": {
+      "file": "rice.png",
+      "emoji": "Cooked rice"
+    },
+    "dumplings": {
+      "file": "dumplings.png",
+      "emoji": "Dumpling"
+    },
+    "sushi": {
+      "file": "sushi.png",
+      "emoji": "Sushi"
+    },
+    "snack": {
+      "file": "snack.png",
+      "emoji": "Pretzel"
+    },
+    "snack bar": {
+      "file": "snack_bar.png",
+      "emoji": "Chocolate bar"
+    },
+    "protein bar": {
+      "file": "protein_bar.png",
+      "emoji": "Chocolate bar"
+    },
+    "granola bar": {
+      "file": "granola_bar.png",
+      "emoji": "Chocolate bar"
+    },
+    "energy bar": {
+      "file": "energy_bar.png",
+      "emoji": "Chocolate bar"
+    },
+    "chocolate": {
+      "file": "chocolate.png",
+      "emoji": "Chocolate bar"
+    },
+    "chocolate bar": {
+      "file": "chocolate_bar.png",
+      "emoji": "Chocolate bar"
+    },
+    "candy": {
+      "file": "candy.png",
+      "emoji": "Candy"
+    },
+    "candy bar": {
+      "file": "candy_bar.png",
+      "emoji": "Chocolate bar"
+    },
+    "cookie": {
+      "file": "cookie.png",
+      "emoji": "Cookie"
+    },
+    "cake": {
+      "file": "cake.png",
+      "emoji": "Shortcake"
+    },
+    "pie": {
+      "file": "pie.png",
+      "emoji": "Pie"
+    },
+    "pastry": {
+      "file": "pastry.png",
+      "emoji": "Croissant"
+    },
+    "dessert": {
+      "file": "dessert.png",
+      "emoji": "Cupcake"
+    },
+    "pudding": {
+      "file": "pudding.png",
+      "emoji": "Custard"
+    },
+    "jello": {
+      "file": "jello.png",
+      "emoji": "Custard"
+    },
+    "whipped cream": {
+      "file": "whipped_cream.png",
+      "emoji": "Soft ice cream"
+    },
+    "ice cream": {
+      "file": "ice_cream.png",
+      "emoji": "Ice cream"
+    }
+  }
+}

@@ -216,3 +216,10 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Secrets
+backend/api_key/*
+!backend/api_key/README.md
+
+# Local experiment runs (backend/pipeline.sh)
+backend/experiments/
