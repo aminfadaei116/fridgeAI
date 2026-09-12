@@ -1,0 +1,38 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "fridge-agent",
+  "main": "worker/index.ts",
+  "compatibility_date": "2026-09-12",
+
+  "containers": [
+    {
+      "class_name": "FridgeContainer",
+      "image": "./Dockerfile",
+      // basic = 1/4 vCPU, 1 GiB. The lite type's 256 MiB is too tight once OpenCV and
+      // NumPy are imported at startup (backend/capture.py:17).
+      "instance_type": "basic",
+      // One fridge. See the comment in worker/index.ts on why this must not scale out.
+      "max_instances": 1
+    }
+  ],
+
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "FRIDGE",
+        "class_name": "FridgeContainer"
+      }
+    ]
+  },
+
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["FridgeContainer"]
+    }
+  ],
+
+  "observability": {
+    "enabled": true
+  }
+}

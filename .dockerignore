@@ -1,0 +1,28 @@
+.git
+.github
+.venv
+__pycache__
+**/__pycache__
+*.pyc
+*.egg-info
+
+# Runtime state: the DB and captured frames are rebuilt in the container.
+var
+
+# Secrets never enter the image. On Spaces these come from repository secrets.
+.env
+.env.*
+
+tests
+docs
+
+# Worker toolchain: belongs in the Worker bundle, not the container image.
+node_modules
+worker
+package.json
+package-lock.json
+tsconfig.json
+wrangler.jsonc
+.wrangler
+Dockerfile
+.dockerignore
