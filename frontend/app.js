@@ -165,10 +165,16 @@ function setView(view) {
   $("view-today").hidden = view !== "today";
   $("view-inventory").hidden = view !== "inventory";
   $("view-plan").hidden = view !== "plan";
+  $("view-chat").hidden = view !== "chat";
   $("btn-add-toggle").hidden = view !== "inventory";
   renderPageHead();
   if (view === "inventory") renderInventoryRows();
   if (view === "plan") renderPlanRows();
+  // The log only scrolls correctly once the view it lives in is actually visible.
+  if (view === "chat") {
+    const log = $("chat-log");
+    log.scrollTop = log.scrollHeight;
+  }
 }
 
 function renderPageHead() {
@@ -204,6 +210,15 @@ function renderPageHead() {
       heading: "What should we make?",
       sub: "Ideas built around what you already have on hand.",
       chip: soon.length ? `✦ ${soon.length} ${soon.length === 1 ? "item" : "items"} to use soon` : "✦ Nothing urgent",
+    },
+    chat: {
+      eyebrow: "Seven agents, one fridge",
+      heading: "Ask the fridge.",
+      sub: "It knows what is inside, what it cost, and when it dies. Tell it about tonight and "
+        + "the plan moves with you.",
+      chip: state.modelAvailable
+        ? `${items.length} ${items.length === 1 ? "item" : "items"} in context`
+        : "Agents offline",
     },
   }[state.view];
 
@@ -932,7 +947,7 @@ function thinking(text = "thinking…") {
 
 async function send(text) {
   if (!text.trim()) return;
-  setView("today");
+  setView("chat");
   addBubble("user", text);
   $("chat-text").value = "";
   const pending = thinking();
@@ -1262,7 +1277,7 @@ function wire() {
   });
 
   $("btn-digest").addEventListener("click", async () => {
-    setView("today");
+    setView("chat");
     const pending = thinking("writing the briefing…");
     try {
       const digest = await apiJson("/api/digest");

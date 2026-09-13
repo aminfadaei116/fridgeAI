@@ -77,6 +77,10 @@
         <span class="nav-ico" aria-hidden="true">✦</span>
         <span class="nav-label">Meal plan</span>
       </button>
+      <button class="nav-btn" data-view="chat">
+        <span class="nav-ico" aria-hidden="true">❞</span>
+        <span class="nav-label">Ask the fridge</span>
+      </button>
     </nav>
 
     <div class="rail-foot">
@@ -171,23 +175,6 @@
               </div>
               <div id="today-menu" class="stack"></div>
             </article>
-
-            <article class="card">
-              <div class="card-head">
-                <h2>Ask the fridge</h2>
-              </div>
-              <div class="chat-log" id="chat-log" aria-live="polite"></div>
-              <div class="chips" id="chat-chips">
-                <button class="pill" data-say="What's going off first?">What's going off first?</button>
-                <button class="pill" data-say="Four guests tonight, vegetarian. What can I make?">4 guests, vegetarian</button>
-                <button class="pill" data-say="How much have I wasted this week?">Waste report</button>
-              </div>
-              <form class="composer" id="composer">
-                <input id="chat-text" type="text" autocomplete="off" placeholder="Ask about what's inside…" />
-                <button type="button" class="mic" id="btn-mic" aria-label="Speak to the fridge">🎙</button>
-              </form>
-              <p class="hint" id="chat-hint"></p>
-            </article>
           </div>
 
           <div class="col">
@@ -257,11 +244,6 @@
               <div class="card-head"><h2>Activity</h2></div>
               <div id="activity"></div>
             </article>
-
-            <article class="card">
-              <div class="card-head"><h2>Seven agents</h2></div>
-              <div id="roster"></div>
-            </article>
           </div>
         </div>
       </section>
@@ -320,6 +302,37 @@
               <div class="card-head"><h2>This week</h2></div>
               <div class="week" id="week"></div>
               <p class="week-note" id="week-note"></p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <!-- --------------------------------------------------------------- CHAT -->
+      <section class="view" id="view-chat" hidden>
+        <div class="split">
+          <div class="col">
+            <article class="card chat-card">
+              <div class="chat-log" id="chat-log" aria-live="polite"></div>
+              <div class="chips" id="chat-chips">
+                <button class="pill" data-say="What's going off first?">What's going off first?</button>
+                <button class="pill" data-say="Four guests tonight, vegetarian. What can I make?">4 guests, vegetarian</button>
+                <button class="pill" data-say="How much have I wasted this week?">Waste report</button>
+                <button class="pill" data-say="What should I cook tonight?">What's for dinner?</button>
+              </div>
+              <form class="composer" id="composer">
+                <input id="chat-text" type="text" autocomplete="off" placeholder="Ask about what's inside…" />
+                <button type="button" class="mic" id="btn-mic" aria-label="Speak to the fridge">🎙</button>
+              </form>
+              <p class="hint" id="chat-hint"></p>
+            </article>
+          </div>
+
+          <div class="col">
+            <article class="card">
+              <div class="card-head"><h2>Who it asks</h2></div>
+              <p class="muted">You talk to the concierge. It routes the question to whichever of
+                the other six can answer, and tells you which ones it used.</p>
+              <div id="roster"></div>
             </article>
           </div>
         </div>

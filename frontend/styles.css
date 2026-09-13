@@ -731,10 +731,22 @@ a:hover { color: var(--green-dark); }
 
 /* --- chat ------------------------------------------------------------------ */
 
-.chat-log { display: flex; flex-direction: column; gap: 8px; max-height: 280px; overflow-y: auto; }
-.bubble { font-size: 13.5px; line-height: 1.5; padding: 10px 13px; white-space: pre-wrap; overflow-wrap: anywhere; }
-.bubble-user { align-self: flex-end; max-width: 88%; background: var(--wash); border-radius: 14px 14px 4px 14px; }
-.bubble-agent { align-self: flex-start; max-width: 94%; background: var(--green-tint); color: #1e4b3b; border-radius: 14px 14px 14px 4px; }
+.chat-log { display: flex; flex-direction: column; gap: 8px; overflow-y: auto; }
+
+/* Chat is its own destination, so the log takes the height the view gives it. The card is
+   pinned to the viewport so the composer stays put while the log scrolls under it. */
+.chat-card { min-height: min(66vh, 620px); }
+.chat-card .chat-log { flex: 1; min-height: 0; }
+
+.bubble {
+  font-size: 14px; line-height: 1.55; padding: 11px 14px;
+  white-space: pre-wrap; overflow-wrap: anywhere;
+  /* A character cap, not a percentage: the view is wide enough that 94% would run past a
+     comfortable measure and the eye would lose the line. */
+  max-width: min(100%, 62ch);
+}
+.bubble-user { align-self: flex-end; background: var(--wash); border-radius: 14px 14px 4px 14px; }
+.bubble-agent { align-self: flex-start; background: var(--green-tint); color: #1e4b3b; border-radius: 14px 14px 14px 4px; }
 .bubble-agent.thinking { color: var(--ink-3); font-style: italic; }
 
 .ran { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 7px; }
@@ -828,8 +840,9 @@ a:hover { color: var(--green-dark); }
   }
   .rail-brand { flex: 1; }
   .rail-nav { flex-direction: row; order: 3; width: 100%; }
-  .nav-btn { flex: 1; justify-content: center; }
+  .nav-btn { flex: 1; justify-content: center; padding: 10px 6px; font-size: 13px; }
   .nav-ico { display: none; }
+  .nav-label { flex: none; text-align: center; }
   .rail-foot { margin-top: 0; flex-direction: row; align-items: center; gap: 8px; }
   .scan-cta-text, .who-text, .who-arrow, .scan-cta-arrow { display: none; }
   .scan-cta, .who { width: auto; padding: 8px; }
